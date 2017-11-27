@@ -17,18 +17,52 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_PRIORITY_HPP
-#define CAF_PRIORITY_HPP
-
-#include <cstdint>
+#ifndef CAF_INTRUSIVE_DOUBLY_LINKED_HPP
+#define CAF_INTRUSIVE_DOUBLY_LINKED_HPP
 
 namespace caf {
+namespace intrusive {
 
-enum class message_priority : uint32_t {
-  normal,
-  high = 3 // 0b11, see message_id.hpp why this is important
+/// Intrusive base for doubly linked types that allows queues to use `T` with
+/// dummy nodes.
+template <class T>
+struct doubly_linked {
+  // -- member types -----------------------------------------------------------
+
+  /// The type for dummy nodes in doubly linked lists.
+  using node_type = doubly_linked<T>;
+
+  /// Type of the pointer connecting two doubly linked nodes.
+  using node_pointer = node_type*;
+
+  // -- constructors, destructors, and assignment operators --------------------
+
+  doubly_linked(node_pointer n = nullptr, node_pointer p = nullptr)
+      : next(n),
+        prev(p) {
+    // nop
+  }
+
+  // -- member variables -------------------------------------------------------
+
+  /// Intrusive pointer to the next element.
+  node_pointer next;
+
+  /// Intrusive pointer to the previous element.
+  node_pointer prev;
 };
 
+template <class T>
+T* promote(doubly_linked<T>* ptr) {
+  return static_cast<T*>(ptr);
+}
+
+template <class T>
+const T* promote(const doubly_linked<T>* ptr) {
+  return static_cast<const T*>(ptr);
+}
+
+} // namespace intrusive
 } // namespace caf
 
-#endif // CAF_PRIORITY_HPP
+#endif // CAF_INTRUSIVE_DOUBLY_LINKED_HPP
