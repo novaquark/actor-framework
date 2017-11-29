@@ -20,6 +20,7 @@
 #include "caf/invalid_stream_gatherer.hpp"
 
 #include "caf/logger.hpp"
+#include "caf/response_promise.hpp"
 
 namespace caf {
 

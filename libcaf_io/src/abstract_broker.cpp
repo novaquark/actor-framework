@@ -64,7 +64,6 @@ bool abstract_broker::cleanup(error&& reason, execution_unit* host) {
   close_all();
   CAF_ASSERT(doormen_.empty());
   CAF_ASSERT(scribes_.empty());
-  cache_.clear();
   return local_actor::cleanup(std::move(reason), host);
 }
 
