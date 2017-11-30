@@ -17,63 +17,16 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_STREAM_ID_HPP
-#define CAF_STREAM_ID_HPP
+#ifndef CAF_STREAM_SLOT_HPP
+#define CAF_STREAM_SLOT_HPP
 
 #include <cstdint>
 
-#include "caf/actor_addr.hpp"
-
-#include "caf/meta/type_name.hpp"
-
-#include "caf/detail/comparable.hpp"
-
 namespace caf {
 
-class stream_id : detail::comparable<stream_id> {
-public:
-  stream_id(stream_id&&) = default;
-  stream_id(const stream_id&) = default;
-  stream_id& operator=(stream_id&&) = default;
-  stream_id& operator=(const stream_id&) = default;
-
-  stream_id();
-
-  stream_id(none_t);
-
-  stream_id(actor_addr origin_actor, uint64_t origin_nr);
-
-  stream_id(actor_control_block* origin_actor, uint64_t origin_nr);
-
-  stream_id(const strong_actor_ptr& origin_actor, uint64_t origin_nr);
-
-  int64_t compare(const stream_id& other) const;
-
-  actor_addr origin;
-  uint64_t nr;
-
-  inline bool valid() const {
-    return origin != nullptr;
-  }
-};
-
-template <class Inspector>
-typename Inspector::result_type inspect(Inspector& f, stream_id& x) {
-  return f(meta::type_name("stream_id"), x.origin, x.nr);
-}
+/// Actor-specific identifier for stream traffic.
+using stream_slot = uint64_t;
 
 } // namespace caf
 
-namespace std {
-template <>
-struct hash<caf::stream_id> {
-  size_t operator()(const caf::stream_id& x) const {
-    auto tmp = reinterpret_cast<ptrdiff_t>(x.origin.get())
-               ^ static_cast<ptrdiff_t>(x.nr);
-    return static_cast<size_t>(tmp);
-  }
-};
-} // namespace std
-
-
-#endif // CAF_STREAM_ID_HPP
+#endif // CAF_STREAM_SLOT_HPP

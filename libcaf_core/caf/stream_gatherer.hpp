@@ -25,6 +25,7 @@
 #include <utility>
 
 #include "caf/fwd.hpp"
+#include "caf/stream_slot.hpp"
 
 namespace caf {
 
@@ -48,7 +49,7 @@ public:
   // -- pure virtual memeber functions -----------------------------------------
 
   /// Adds a path to the edge and emits `ack_open` to the source.
-  /// @param sid Stream ID used by the source.
+  /// @param slot Stream ID used by the source.
   /// @param x Handle to the source.
   /// @param original_stage Actor that received the stream handshake initially.
   /// @param prio Priority of data on this path.
@@ -60,13 +61,13 @@ public:
   ///                  it until the gatherer acknowledges the handshake. The
   ///                  callback is invalid if the stream has a next stage.
   /// @returns The added path on success, `nullptr` otherwise.
-  virtual path_ptr add_path(const stream_id& sid, strong_actor_ptr x,
+  virtual path_ptr add_path(stream_slot slot, strong_actor_ptr x,
                             strong_actor_ptr original_stage,
                             stream_priority prio, long available_credit,
                             bool redeployable, response_promise result_cb) = 0;
 
   /// Removes a path from the gatherer.
-  virtual bool remove_path(const stream_id& sid, const actor_addr& x,
+  virtual bool remove_path(stream_slot slot, const actor_addr& x,
                            error reason, bool silent) = 0;
 
   /// Removes all paths gracefully.
@@ -88,11 +89,11 @@ public:
   virtual void continuous(bool value) = 0;
 
   /// Returns the stored state for `x` if `x` is a known path and associated to
-  /// `sid`, otherwise `nullptr`.
-  virtual path_ptr find(const stream_id& sid, const actor_addr& x) = 0;
+  /// `slot`, otherwise `nullptr`.
+  virtual path_ptr find(stream_slot slot, const actor_addr& x) = 0;
 
   /// Returns the stored state for `x` if `x` is a known path and associated to
-  /// `sid`, otherwise `nullptr`.
+  /// `slot`, otherwise `nullptr`.
   virtual path_ptr path_at(size_t index) = 0;
 
   /// Assigns new credit to all sources.
@@ -104,11 +105,11 @@ public:
   // -- convenience functions --------------------------------------------------
 
   /// Removes a path from the gatherer.
-  bool remove_path(const stream_id& sid, const strong_actor_ptr& x,
+  bool remove_path(stream_slot slot, const strong_actor_ptr& x,
                    error reason, bool silent);
 
   /// Convenience function for calling `find(x, actor_cast<actor_addr>(x))`.
-  path_ptr find(const stream_id& sid, const strong_actor_ptr& x);
+  path_ptr find(stream_slot slot, const strong_actor_ptr& x);
 };
 
 } // namespace caf
