@@ -17,55 +17,38 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_STREAM_SLOT_HPP
-#define CAF_STREAM_SLOT_HPP
-
-#include <cstdint>
-#include <tuple>
-
-#include "caf/detail/comparable.hpp"
+#ifndef CAF_DETAIL_OVERLOAD_HPP
+#define CAF_DETAIL_OVERLOAD_HPP
 
 namespace caf {
+namespace detail {
 
-/// Identifies a single stream path in the same way a TCP port identifies a
-/// connection over IP.
-using stream_slot = uint16_t;
+template <class... Fs>
+struct overload;
 
-/// Maps two `stream_slot` values into a pair for storing sender and receiver
-/// slot information.
-struct stream_slots : detail::comparable<stream_slots>{
-  stream_slot sender;
-  stream_slot receiver;
-
-  // -- constructors, destructors, and assignment operators --------------------
-
-  constexpr stream_slots(stream_slot sender_slot, stream_slot receiver_slot)
-      : sender(sender_slot),
-        receiver(receiver_slot) {
+template <class F>
+struct overload<F> : F {
+  using F::operator();
+  overload(F f) : F(f) {
     // nop
-  }
-
-  // -- observers --------------------------------------------------------------
-
-  /// Returns an inverted pair, i.e., swaps sender and receiver slot.
-  constexpr stream_slots invert() const {
-    return {receiver, sender};
-  }
-
-  inline int_fast32_t compare(stream_slots other) const noexcept {
-    static_assert(sizeof(stream_slots) == sizeof(int32_t),
-                  "sizeof(stream_slots) != sizeof(int32_t)");
-    return reinterpret_cast<const int32_t&>(*this)
-           - reinterpret_cast<int32_t&>(other);
   }
 };
 
-/// @relates stream_slots
-template <class Inspector>
-typename Inspector::result_type inspect(Inspector& f, stream_slots& x) {
-  return f(std::tie(x.sender, x.receiver));
+template <class F, class... Fs>
+struct overload<F, Fs...> : F, overload<Fs...> {
+  using F::operator();
+  using overload<Fs...>::operator();
+  overload(F f, Fs... fs) : F(f), overload<Fs...>(fs...) {
+    // nop
+  }
+};
+
+template <class... Fs>
+overload<Fs...> make_overload(Fs... fs) {
+  return {fs...};
 }
 
+} // namespace detail
 } // namespace caf
 
-#endif // CAF_STREAM_SLOT_HPP
+#endif // CAF_DETAIL_OVERLOAD_HPP
