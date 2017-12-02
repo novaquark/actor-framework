@@ -25,7 +25,6 @@
 
 #include "caf/ref_counted.hpp"
 #include "caf/stream_manager.hpp"
-#include "caf/random_gatherer.hpp"
 #include "caf/scheduled_actor.hpp"
 #include "caf/broadcast_scatterer.hpp"
 
@@ -62,9 +61,6 @@ namespace detail {
 ///
 ///   /// Groups multiple topics into a single selection filter.
 ///   using filter_type = ...;
-///
-///   /// Policy for gathering data from peers.
-///   using gatherer_type = ...;
 ///
 ///   /// Policy for scattering data to peers.
 ///   using scatterer_type = ...;
@@ -103,10 +99,8 @@ template <class Policy>
 class stream_distribution_tree : public stream_manager {
 public:
   // -- nested types -----------------------------------------------------------
-  
-  using super = stream_manager;
 
-  using gatherer_type = typename Policy::gatherer_type;
+  using super = stream_manager;
 
   using scatterer_type = typename Policy::scatterer_type;
 
@@ -126,7 +120,7 @@ public:
   }
 
   // -- Accessors --------------------------------------------------------------
- 
+
   inline Policy& policy() {
     return policy_;
   }
@@ -187,10 +181,6 @@ public:
     return false;
   }
 
-  gatherer_type& in() override {
-    return in_;
-  }
-
   scatterer_type& out() override {
     return out_;
   }
@@ -236,7 +226,6 @@ public:
 
 private:
   scheduled_actor* self_;
-  gatherer_type in_;
   scatterer_type out_;
   Policy policy_;
 };
