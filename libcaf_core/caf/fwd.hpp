@@ -57,7 +57,6 @@ template <class...> class typed_event_based_actor;
 
 // -- variadic templates with 1 fixed argument ---------------------------------
 
-template <class, class...> class fused_scatterer;
 template <class, class...> class annotated_stream;
 
 // -- classes ------------------------------------------------------------------

@@ -42,7 +42,6 @@
 #include "caf/stream_stage_impl.hpp"
 #include "caf/stream_source_impl.hpp"
 #include "caf/stream_result_trait.hpp"
-#include "caf/broadcast_scatterer.hpp"
 #include "caf/terminal_stream_scatterer.hpp"
 
 #include "caf/to_string.hpp"
