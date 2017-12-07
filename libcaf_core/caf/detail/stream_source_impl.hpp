@@ -17,8 +17,8 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_STREAM_SOURCE_IMPL_HPP
-#define CAF_STREAM_SOURCE_IMPL_HPP
+#ifndef CAF_DETAIL_STREAM_SOURCE_IMPL_HPP
+#define CAF_DETAIL_STREAM_SOURCE_IMPL_HPP
 
 #include "caf/downstream.hpp"
 #include "caf/logger.hpp"
@@ -30,6 +30,7 @@
 #include "caf/policy/arg.hpp"
 
 namespace caf {
+namespace detail {
 
 template <class Fun, class Predicate, class DownstreamPolicy>
 class stream_source_impl : public stream_manager {
@@ -97,6 +98,7 @@ stream_manager_ptr make_stream_source(local_actor* self, Init init, Fun f,
   return ptr;
 }
 
+} // namespace detail
 } // namespace caf
 
-#endif // CAF_STREAM_SOURCE_IMPL_HPP
+#endif // CAF_DETAIL_STREAM_SOURCE_IMPL_HPP
