@@ -33,6 +33,8 @@ public:
 
   void emit_batches() override;
 
+  void force_emit_batches() override;
+
   size_t capacity() const noexcept override;
 
   size_t buffered() const noexcept override;
