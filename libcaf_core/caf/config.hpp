@@ -63,6 +63,8 @@
 // CAF_PUSH_WARNINGS and CAF_POP_WARNINGS
 #if defined(__clang__)
 #  define CAF_CLANG
+#  define CAF_LIKELY(x) __builtin_expect((x), 1)
+#  define CAF_UNLIKELY(x) __builtin_expect((x), 0)
 #  define CAF_DEPRECATED __attribute__((__deprecated__))
 #  define CAF_DEPRECATED_MSG(msg) __attribute__((__deprecated__(msg)))
 #  define CAF_PUSH_WARNINGS                                                    \
@@ -105,6 +107,8 @@
 #  endif
 #elif defined(__GNUC__)
 #  define CAF_GCC
+#  define CAF_LIKELY(x) __builtin_expect((x), 1)
+#  define CAF_UNLIKELY(x) __builtin_expect((x), 0)
 #  define CAF_DEPRECATED __attribute__((__deprecated__))
 #  define CAF_DEPRECATED_MSG(msg) __attribute__((__deprecated__(msg)))
 #  define CAF_PUSH_WARNINGS
@@ -131,6 +135,8 @@
 #  endif
 #elif defined(_MSC_VER)
 #  define CAF_MSVC
+#  define CAF_LIKELY(x) x
+#  define CAF_UNLIKELY(x) x
 #  define CAF_DEPRECATED
 #  define CAF_DEPRECATED_MSG(msg)
 #  define CAF_PUSH_WARNINGS
@@ -145,6 +151,8 @@
 #    define NOMINMAX
 #  endif // NOMINMAX
 #else
+#  define CAF_LIKELY(x) x
+#  define CAF_UNLIKELY(x) x
 #  define CAF_DEPRECATED
 #  define CAF_PUSH_WARNINGS
 #  define CAF_POP_WARNINGS
