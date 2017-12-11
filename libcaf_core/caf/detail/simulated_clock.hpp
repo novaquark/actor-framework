@@ -17,40 +17,50 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#include "caf/actor_config.hpp"
+#ifndef CAF_DETAIL_SIMULATED_CLOCK_HPP
+#define CAF_DETAIL_SIMULATED_CLOCK_HPP
 
-#include "caf/abstract_actor.hpp"
+#include <chrono>
+
+#include "caf/atom.hpp"
 
 namespace caf {
+namespace detail {
 
-actor_config::actor_config(execution_unit* ptr)
-  : host(ptr),
-    flags(abstract_channel::is_abstract_actor_flag),
-    groups(nullptr) {
-  // nop
-}
+/// Converts realtime into a series of ticks, whereas each tick represents a
+/// preconfigured timespan. For example, a tick emitter configured with a
+/// timespan of 25ms generates a tick every 25ms after starting it.
+class simulated_clock {
+public:
+  // -- member types -----------------------------------------------------------
 
-std::string to_string(const actor_config& x) {
-  // Note: x.groups is an input range. Traversing it is emptying it, hence we
-  // cannot look inside the range here.
-  std::string result = "actor_config(";
-  bool first = false;
-  auto add = [&](int flag, const char* name) {
-    if ((x.flags & flag) != 0) {
-      if (first)
-        first = false;
-      else
-        result += ", ";
-      result += name;
-    }
-  };
-  add(abstract_channel::is_actor_bind_decorator_flag, "bind_decorator_flag");
-  add(abstract_channel::is_actor_dot_decorator_flag, "dot_decorator_flag");
-  add(abstract_actor::is_detached_flag, "detached_flag");
-  add(abstract_actor::is_blocking_flag, "blocking_flag");
-  add(abstract_actor::is_hidden_flag, "hidden_flag");
-  result += ")";
-  return result;
-}
+  /// Discrete point in time.
+  using clock_type = std::chrono::steady_clock;
 
+  /// Discrete point in time.
+  using time_point = typename clock_type::time_point;
+
+  /// Discrete point in time.
+  using duration_type = typename clock_type::duration;
+
+  // -- constructors, destructors, and assignment operators --------------------
+
+  simulated_clock() = default;
+
+  virtual ~simulated_clock();
+
+  // -- observers --------------------------------------------------------------
+
+  virtual time_point now() const noexcept = 0;
+
+  /// Returns the difference between `t0` and `t1`, allowing the clock to
+  /// return any arbitrary value depending on the measurement that took place.
+  virtual duration_type difference(atom_value measurement, time_point t0,
+                                   time_point t1) const noexcept;
+};
+
+} // namespace detail
 } // namespace caf
+
+#endif // CAF_DETAIL_SIMULATED_CLOCK_HPP
+
