@@ -35,6 +35,7 @@
 
 #include <string>
 #include <typeinfo>
+#include <typeindex>
 
 namespace caf {
 namespace detail {
@@ -44,6 +45,8 @@ void prettify_type_name(std::string& class_name);
 void prettify_type_name(std::string& class_name, const char* input_class_name);
 
 std::string pretty_type_name(const std::type_info& x);
+
+std::string pretty_type_name(std::type_index x);
 
 } // namespace detail
 } // namespace caf

@@ -76,7 +76,11 @@ basp_broker_state::basp_broker_state(broker* selfptr)
     : basp::instance::callee(selfptr->system(),
                              static_cast<proxy_registry::backend&>(*this)),
       self(selfptr),
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      instance(selfptr, *this, stats),
+#else
       instance(selfptr, *this),
+#endif
       max_buffers(self->system().config().middleman_cached_udp_buffers),
       max_pending_messages(self->system().config().middleman_max_pending_msgs) {
   CAF_ASSERT(this_node() != none);
@@ -311,6 +315,7 @@ void basp_broker_state::deliver(const node_id& src_nid, actor_id src_aid,
     return;
   }
   self->parent().notify<hook::message_received>(src_nid, src, dest, mid, msg);
+  // TODO TEMP std::cout << "BASP_BROKER enqueue " << to_string(msg) << " into mb of " << to_string(dest) << std::endl;
   dest->enqueue(make_mailbox_element(std::move(src), mid, std::move(stages),
                                      std::move(msg)),
                 nullptr);
@@ -739,6 +744,12 @@ behavior basp_broker::make_behavior() {
         strong_actor_ptr& dest, message_id mid, const message& msg) {
       CAF_LOG_TRACE(CAF_ARG(src) << CAF_ARG(dest)
                     << CAF_ARG(mid) << CAF_ARG(msg));
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      auto msgtype = instrumentation::get_msgtype(msg);
+      auto mb_wait_time = timestamp_ago_ns(this->current_message_ts());
+      auto mb_size = this->mailbox_cached_count();
+      state.stats.record_broker_forward(msgtype, mb_wait_time, mb_size);
+#endif
       if (!dest || system().node() == dest->node()) {
         CAF_LOG_WARNING("cannot forward to invalid or local actor:"
                         << CAF_ARG(dest));

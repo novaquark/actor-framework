@@ -23,6 +23,8 @@
 
 #include "caf/config.hpp"
 
+#include "caf/instrumentation/worker_stats.hpp"
+
 namespace caf {
 
 /// Identifies an execution unit, e.g., a worker thread of the scheduler. By
@@ -58,9 +60,19 @@ public:
     proxies_ = ptr;
   }
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  /// Stat collector for this uit.
+  instrumentation::lockable_worker_stats& stats() {
+    return stats_;
+  }
+#endif
+
 protected:
   actor_system* system_;
   proxy_registry* proxies_;
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  instrumentation::lockable_worker_stats stats_;
+#endif
 };
 
 } // namespace caf

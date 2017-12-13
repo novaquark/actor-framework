@@ -5,7 +5,8 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright 2011-2018 Dominik Charousset                                     *
+ * Copyright (C) 2011 - 2017                                                  *
+ * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -16,44 +17,48 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TIMESTAMP_HPP
-#define CAF_TIMESTAMP_HPP
+#ifndef CAF_BROKER_STATS_HPP
+#define CAF_BROKER_STATS_HPP
 
-#include <chrono>
-#include <string>
+#include "caf/instrumentation/instrumentation_ids.hpp"
+#include "caf/instrumentation/stat_stream.hpp"
+
+#include <unordered_map>
 #include <cstdint>
+#include <string>
+#include <mutex>
 
 namespace caf {
+namespace instrumentation {
 
-#if defined(CAF_ENABLE_INSTRUMENTATION) && !defined(__APPLE__)
-/* using this clock leads to non standard assumption that breaks on MacOS.
-   high_resolution_clock is not required to have to_time_t.  Only system_clock has.
-   Let's be practical.  std::chrono::system_clock is good enough in practice.
- */
-using clock_source = std::chrono::high_resolution_clock;
-#else
-using clock_source = std::chrono::system_clock;
-#endif
+/// Instrumentation stats aggregated per-worker for all callsites.
+class broker_stats {
+  friend class lockable_broker_stats;
 
-/// A portable timestamp with nanosecond resolution anchored at the UNIX epoch.
-using timestamp = std::chrono::time_point<
-  clock_source,
-  std::chrono::duration<int64_t, std::nano>
->;
+public:
+  std::string to_string() const;
 
-/// Convenience function for returning a `timestamp` representing
-/// the current system time.
-timestamp make_timestamp();
+  const std::unordered_map<msgtype_id, stat_stream>& get_forward_wait_durations() const;
+  const stat_stream& get_forward_size() const;
+  const std::unordered_map<msgtype_id, size_t>& get_message_counts() const;
 
-/// Converts the time-since-epoch of `x` to a `string`.
-std::string timestamp_to_string(const timestamp& x);
+protected:
+  std::unordered_map<msgtype_id, stat_stream> forward_waittimes_;
+  stat_stream forward_mb_size_;
+  std::unordered_map<msgtype_id, size_t> receive_msg_count_;
+};
 
-/// Appends the time-since-epoch of `y` to `x`.
-void append_timestamp_to_string(std::string& x, const timestamp& y);
+class lockable_broker_stats : public broker_stats {
+public:
+  void record_broker_receive(msgtype_id mt);
+  void record_broker_forward(msgtype_id mt, int64_t mb_waittime, size_t mb_size);
+  broker_stats collect();
 
-/// How long ago (in nanoseconds) was the given timestamp?
-int64_t timestamp_ago_ns(const timestamp& ts);
+private:
+  std::mutex access_mutex_;
+};
 
+} // namespace instrumentation
 } // namespace caf
 
-#endif // CAF_TIMESTAMP_HPP
+#endif // CAF_BROKER_STATS_HPP

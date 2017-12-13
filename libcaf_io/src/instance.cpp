@@ -52,12 +52,22 @@ instance::callee::~callee() {
   // nop
 }
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+instance::instance(abstract_broker* parent, callee& lstnr, instrumentation::lockable_broker_stats& stats)
+    : tbl_(parent),
+      this_node_(parent->system().node()),
+      callee_(lstnr),
+      stats_(stats) {
+  CAF_ASSERT(this_node_ != none);
+}
+#else
 instance::instance(abstract_broker* parent, callee& lstnr)
     : tbl_(parent),
       this_node_(parent->system().node()),
       callee_(lstnr) {
   CAF_ASSERT(this_node_ != none);
 }
+#endif
 
 connection_state instance::handle(execution_unit* ctx,
                                   new_data_msg& dm, header& hdr,
@@ -96,6 +106,7 @@ connection_state instance::handle(execution_unit* ctx,
   // needs forwarding?
   if (!is_handshake(hdr) && !is_heartbeat(hdr) && hdr.dest_node != this_node_) {
     CAF_LOG_DEBUG("forward message");
+    // TODO instrument this?
     auto path = lookup(hdr.dest_node);
     if (path) {
       binary_serializer bs{ctx, callee_.get_buffer(path->hdl)};

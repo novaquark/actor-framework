@@ -5,7 +5,8 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright 2011-2018 Dominik Charousset                                     *
+ * Copyright (C) 2011 - 2017                                                  *
+ * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -16,44 +17,22 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TIMESTAMP_HPP
-#define CAF_TIMESTAMP_HPP
+#ifndef CAF_SYSTEM_STATS_HPP
+#define CAF_SYSTEM_STATS_HPP
 
-#include <chrono>
-#include <string>
-#include <cstdint>
+#include "caf/instrumentation/broker_stats.hpp"
+#include "caf/instrumentation/worker_stats.hpp"
 
 namespace caf {
+namespace instrumentation {
 
-#if defined(CAF_ENABLE_INSTRUMENTATION) && !defined(__APPLE__)
-/* using this clock leads to non standard assumption that breaks on MacOS.
-   high_resolution_clock is not required to have to_time_t.  Only system_clock has.
-   Let's be practical.  std::chrono::system_clock is good enough in practice.
- */
-using clock_source = std::chrono::high_resolution_clock;
-#else
-using clock_source = std::chrono::system_clock;
-#endif
+/// Instrumentation stats aggregated for the whole actor_system.
+struct system_stats {
+  worker_stats worker;
+  broker_stats broker;
+};
 
-/// A portable timestamp with nanosecond resolution anchored at the UNIX epoch.
-using timestamp = std::chrono::time_point<
-  clock_source,
-  std::chrono::duration<int64_t, std::nano>
->;
-
-/// Convenience function for returning a `timestamp` representing
-/// the current system time.
-timestamp make_timestamp();
-
-/// Converts the time-since-epoch of `x` to a `string`.
-std::string timestamp_to_string(const timestamp& x);
-
-/// Appends the time-since-epoch of `y` to `x`.
-void append_timestamp_to_string(std::string& x, const timestamp& y);
-
-/// How long ago (in nanoseconds) was the given timestamp?
-int64_t timestamp_ago_ns(const timestamp& ts);
-
+} // namespace instrumentation
 } // namespace caf
 
-#endif // CAF_TIMESTAMP_HPP
+#endif // CAF_SYSTEM_STATS_HPP

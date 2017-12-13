@@ -60,6 +60,16 @@ public:
     return new coordinator(sys);
   }
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  instrumentation::worker_stats collect_metrics() override {
+    instrumentation::worker_stats combined_stats;
+    for (auto& w : workers_) {
+      combined_stats.combine(w->stats().collect());
+    }
+    return combined_stats;
+  }
+#endif
+
 protected:
   void start() override {
     // initialize workers vector

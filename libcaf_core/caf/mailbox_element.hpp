@@ -63,6 +63,11 @@ public:
   /// if this is empty then the original sender receives the response.
   forwarding_stack stages;
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  /// When was this mailbox_element created?
+  timestamp ts = make_timestamp();
+#endif
+
   mailbox_element();
 
   mailbox_element(strong_actor_ptr&& x, message_id y,

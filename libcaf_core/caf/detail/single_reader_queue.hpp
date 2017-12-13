@@ -70,6 +70,9 @@ public:
   enqueue_result enqueue(pointer new_element) {
     CAF_ASSERT(new_element != nullptr);
     pointer e = stack_.load();
+#ifdef CAF_ENABLE_INSTRUMENTATION
+    cached_count_++;
+#endif
     for (;;) {
       if (!e) {
         // if tail is nullptr, the queue has been closed
@@ -146,7 +149,11 @@ public:
     cache_.clear(f);
   }
 
-  single_reader_queue() : head_(nullptr) {
+  single_reader_queue() : head_(nullptr)
+#ifdef CAF_ENABLE_INSTRUMENTATION
+    , cached_count_(0)
+#endif
+  {
     stack_ = stack_empty_dummy();
   }
 
@@ -167,6 +174,12 @@ public:
     }
     return res;
   }
+
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  size_t cached_count() const {
+    return cached_count_;
+  }
+#endif
 
   pointer peek() {
     if (head_ != nullptr || fetch_new_data())
@@ -274,6 +287,11 @@ private:
   deleter_type delete_;
   intrusive_partitioned_list<value_type, deleter_type> cache_;
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  // exposed to both the outside (for incrementing) and the owner (for decrementing + inspection)
+  std::atomic<size_t> cached_count_;
+#endif
+
   // atomically sets stack_ back and enqueues all elements to the cache
   bool fetch_new_data(pointer end_ptr) {
     CAF_ASSERT(!end_ptr || end_ptr == stack_empty_dummy());
@@ -316,6 +334,9 @@ private:
     if (head_ != nullptr || fetch_new_data()) {
       auto result = head_;
       head_ = head_->next;
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      cached_count_--;
+#endif
       return result;
     }
     return nullptr;

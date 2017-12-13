@@ -430,6 +430,9 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       return im_skipped;
     auto f = std::move(pr.second);
     awaited_responses_.pop_front();
+# ifdef CAF_ENABLE_INSTRUMENTATION
+    record_response(x.mid);
+# endif
     if (!invoke(this, f, x)) {
       // try again with error if first attempt failed
       auto msg = make_message(make_error(sec::unexpected_response,
@@ -445,6 +448,9 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     // neither awaited nor multiplexed, probably an expired timeout
     if (mrh == multiplexed_responses_.end())
       return im_dropped;
+# ifdef CAF_ENABLE_INSTRUMENTATION
+    record_response(x.mid);
+# endif
     if (!invoke(this, mrh->second, x)) {
       // try again with error if first attempt failed
       auto msg = make_message(make_error(sec::unexpected_response,
@@ -498,8 +504,25 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         return !skipped ? im_success : im_skipped;
       }
       auto& bhvr = bhvr_stack_.back();
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      //auto start = caf::make_timestamp();
+      auto msgtype = instrumentation::get_msgtype(current_element_->content());
+      auto mb_wait_time = caf::timestamp_ago_ns(current_element_->ts);
+      auto mb_size = mailbox_.cached_count(); // WARNING: using count() here can lock the actor when receiving network messages
+#endif
       switch (bhvr(visitor, x.content())) {
         default:
+#ifdef CAF_ENABLE_INSTRUMENTATION
+          // TODO examine the case of detached scheduled_actors
+          if (context_ != nullptr) {
+            //auto process_time = caf::timestamp_ago_ns(start);
+            if (allow_individual_instrumentation()) {
+              context_->stats().record_behavior_individual(instrumentation::get_instrumented_actor_id(*this), msgtype, mb_wait_time, mb_size);
+            } else {
+              context_->stats().record_behavior_aggregate(typeid(*this), msgtype, mb_wait_time, mb_size);
+            }
+          }
+#endif
           break;
         case match_case::skip:
           skipped = true;
@@ -712,4 +735,19 @@ bool scheduled_actor::add_source(const stream_manager_ptr& mgr,
                          opn.redeployable, std::move(result_cb));
 }
 
+# ifdef CAF_ENABLE_INSTRUMENTATION
+  void scheduled_actor::record_response(message_id mid) {
+    if (context() != nullptr) {
+      auto rp_time = responses_times_.find(mid);
+      if (rp_time != responses_times_.end()) {
+        auto req_wait_time = timestamp_ago_ns(rp_time->second.first);
+        if (allow_individual_instrumentation()) {
+          context()->stats().record_request_individual(instrumentation::get_instrumented_actor_id(*this), rp_time->second.second, req_wait_time);
+        } else {
+          context()->stats().record_request_aggregate(typeid(*this), rp_time->second.second, req_wait_time);
+        }
+      }
+    }
+  }
+# endif
 } // namespace caf

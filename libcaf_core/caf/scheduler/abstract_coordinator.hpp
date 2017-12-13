@@ -89,6 +89,12 @@ public:
 
   virtual actor_clock& clock() noexcept = 0;
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  virtual instrumentation::worker_stats collect_metrics() {
+    return {};
+  }
+#endif
+
 protected:
   void stop_actors();
 

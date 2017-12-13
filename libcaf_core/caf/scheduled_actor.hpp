@@ -192,6 +192,16 @@ public:
   /// and managed by this actor or `nullptr`.
   virtual proxy_registry* proxy_registry_ptr();
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  timestamp& current_message_ts() const {
+    return current_element_->ts;
+  }
+
+  size_t mailbox_cached_count() const {
+    return mailbox_.cached_count();
+  }
+#endif
+
   // -- state modifiers --------------------------------------------------------
 
   /// Finishes execution of this actor after any currently running
@@ -800,7 +810,16 @@ public:
     if (!ignore_mid)
       mptr->mid.mark_as_answered();
   }
-
+# ifdef CAF_ENABLE_INSTRUMENTATION
+  template <class... Ts>
+  void register_request(message_id mid, const Ts&... xs) {
+    if (context() != nullptr) {
+      auto cid = instrumentation::get_msgtype(xs...);
+      responses_times_.emplace(mid, std::make_pair(make_timestamp(), cid));
+    }
+  }
+  void record_response(message_id mid);
+# endif // CAF_ENABLE_INSTRUMENTATION
   /// @endcond
 
 protected:
@@ -876,6 +895,10 @@ protected:
   exception_handler exception_handler_;
 # endif // CAF_NO_EXCEPTIONS
 
+# ifdef CAF_ENABLE_INSTRUMENTATION
+  using timed_response = std::pair<timestamp, instrumentation::msgtype_id>;
+  std::unordered_map<message_id, timed_response>   responses_times_;
+# endif // CAF_ENABLE_INSTRUMENTATION
   /// @endcond
 };
 

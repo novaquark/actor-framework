@@ -5,7 +5,8 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright 2011-2018 Dominik Charousset                                     *
+ * Copyright (C) 2011 - 2017                                                  *
+ * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -16,44 +17,61 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TIMESTAMP_HPP
-#define CAF_TIMESTAMP_HPP
+#ifndef CAF_STAT_STREAM_HPP
+#define CAF_STAT_STREAM_HPP
 
-#include <chrono>
-#include <string>
+#include <algorithm>
 #include <cstdint>
+#include <string>
+#include <limits>
 
 namespace caf {
+namespace instrumentation {
 
-#if defined(CAF_ENABLE_INSTRUMENTATION) && !defined(__APPLE__)
-/* using this clock leads to non standard assumption that breaks on MacOS.
-   high_resolution_clock is not required to have to_time_t.  Only system_clock has.
-   Let's be practical.  std::chrono::system_clock is good enough in practice.
- */
-using clock_source = std::chrono::high_resolution_clock;
-#else
-using clock_source = std::chrono::system_clock;
-#endif
+/// Compute statistical properties on a stream of measures.
+class stat_stream {
+public:
+  void record(double value);
+  double average() const;
+  double variance() const;
+  double stddev() const;
+  void combine(const stat_stream& rhs);
+  std::string to_string() const;
 
-/// A portable timestamp with nanosecond resolution anchored at the UNIX epoch.
-using timestamp = std::chrono::time_point<
-  clock_source,
-  std::chrono::duration<int64_t, std::nano>
->;
+  friend void swap(stat_stream&, stat_stream&);
 
-/// Convenience function for returning a `timestamp` representing
-/// the current system time.
-timestamp make_timestamp();
+  bool empty() const {
+    return _n == 0;
+  }
 
-/// Converts the time-since-epoch of `x` to a `string`.
-std::string timestamp_to_string(const timestamp& x);
+  int32_t count() const {
+    return _n;
+  }
 
-/// Appends the time-since-epoch of `y` to `x`.
-void append_timestamp_to_string(std::string& x, const timestamp& y);
+  double min() const {
+    return _min;
+  }
 
-/// How long ago (in nanoseconds) was the given timestamp?
-int64_t timestamp_ago_ns(const timestamp& ts);
+  double max() const {
+    return _max;
+  }
 
+private:
+  uint32_t _n = 0;
+  double _min = std::numeric_limits<double>::max();
+  double _max = std::numeric_limits<double>::lowest();
+  double _m1 = 0.0;
+  double _m2 = 0.0;
+};
+
+inline void swap(stat_stream& a, stat_stream& b)
+{
+  stat_stream tmp = a;
+  a = b;
+  b = tmp;
+}
+
+} // namespace instrumentation
 } // namespace caf
 
-#endif // CAF_TIMESTAMP_HPP
+#endif // CAF_STAT_STREAM_HPP

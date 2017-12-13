@@ -111,6 +111,7 @@ endif(CAF_USE_CCACHE)
 pretty_yes("CAF_FORCE_NO_EXCEPTIONS")
 
 pretty_no("CAF_ENABLE_RUNTIME_CHECKS")
+pretty_no("CAF_ENABLE_INSTRUMENTATION")
 pretty_no("CAF_NO_MEM_MANAGEMENT")
 pretty_no("CAF_NO_EXCEPTIONS")
 pretty_no("CAF_BUILD_STATIC_ONLY")
@@ -311,6 +312,13 @@ endif(CAF_ENABLE_ADDRESS_SANITIZER)
 if(NOT APPLE AND NOT WIN32)
     build_string("EXTRA_FLAGS" "-pthread")
 endif()
+if (CAF_ENABLE_INSTRUMENTATION)
+  if(NOT CAF_OPENTRACING_INCLUDE_DIR)
+    message(FATAL_ERROR "You need to define CAF_OPENTRACING_INCLUDE_DIR to compile with CAF instrumentation enabled")
+  endif()
+  add_definitions(-DWITH_CAF_INSTRUMENTATION)
+  include_directories(${CAF_OPENTRACING_INCLUDE_DIR})
+endif()
 # -fPIC generates warnings on MinGW and Cygwin plus extra setup steps needed on MinGW
 if(MINGW)
   add_definitions(-D_WIN32_WINNT=0x0600)
@@ -387,6 +395,7 @@ to_int_value(CAF_LOG_LEVEL)
 to_int_value(CAF_NO_EXCEPTIONS)
 to_int_value(CAF_NO_MEM_MANAGEMENT)
 to_int_value(CAF_ENABLE_RUNTIME_CHECKS)
+to_int_value(CAF_ENABLE_INSTRUMENTATION)
 
 # find boost asio if the asio multiplexer should be used for testing
 if(CAF_USE_ASIO)
@@ -784,6 +793,7 @@ if(NOT CAF_NO_SUMMARY)
         "\nBuild static only:     ${CAF_BUILD_STATIC_ONLY}"
         "\nBuild static runtime:  ${CAF_BUILD_STATIC_RUNTIME}"
         "\nRuntime checks:        ${CAF_ENABLE_RUNTIME_CHECKS}"
+        "\nInstrumentation:       ${CAF_ENABLE_INSTRUMENTATION}"
         "\nLog level:             ${LOG_LEVEL_STR}"
         "\nWith mem. mgmt.:       ${CAF_BUILD_MEM_MANAGEMENT}"
         "\nWith exceptions:       ${CAF_BUILD_WITH_EXCEPTIONS}"

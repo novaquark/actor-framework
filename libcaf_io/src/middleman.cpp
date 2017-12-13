@@ -433,5 +433,18 @@ int middleman::exec_slave_mode(actor_system&, const actor_system_config&) {
   return 0;
 }
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+instrumentation::broker_stats middleman::collect_metrics() {
+  auto hdl = named_brokers_.find(caf::atom("BASP"));
+  if (hdl != named_brokers_.end()) {
+    auto basp = dynamic_cast<caf::io::basp_broker *>(caf::actor_cast<caf::abstract_actor *>(hdl->second));
+    if (basp != nullptr) {
+      return basp->state.stats.collect();
+    }
+  }
+  return {};
+}
+#endif
+
 } // namespace io
 } // namespace caf

@@ -34,6 +34,10 @@
 #define CAF_ENABLE_RUNTIME_CHECKS
 #endif
 
+#if @CAF_ENABLE_INSTRUMENTATION_INT@ != -1
+#define CAF_ENABLE_INSTRUMENTATION
+#endif
+
 #if @CAF_USE_ASIO_INT@ != -1
 #define CAF_USE_ASIO
 #endif

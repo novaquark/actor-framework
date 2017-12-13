@@ -154,7 +154,7 @@ public:
 
   protected:
     proxy_registry namespace_;
-  };
+  }; // callee
 
   /// Describes a function object responsible for writing
   /// the payload for a BASP message.
@@ -163,7 +163,11 @@ public:
   /// Describes a callback function object for `remove_published_actor`.
   using removed_published_actor = callback<const strong_actor_ptr&, uint16_t>;
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  instance(abstract_broker* parent, callee& lstnr, instrumentation::lockable_broker_stats& stats);
+#else
   instance(abstract_broker* parent, callee& lstnr);
+#endif
 
   /// Handles received data and returns a config for receiving the
   /// next data or `none` if an error occured.
@@ -424,6 +428,10 @@ public:
         if (e)
           return false;
         CAF_LOG_DEBUG(CAF_ARG(forwarding_stack) << CAF_ARG(msg));
+#ifdef CAF_ENABLE_INSTRUMENTATION
+        auto msgtype = instrumentation::get_msgtype(msg);
+        stats_.record_broker_receive(msgtype);
+#endif
         if (hdr.has(header::named_receiver_flag))
           callee_.deliver(hdr.source_node, hdr.source_actor, receiver_name,
                           make_message_id(hdr.operation_data),
@@ -466,6 +474,9 @@ private:
   published_actor_map published_actors_;
   node_id this_node_;
   callee& callee_;
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  instrumentation::lockable_broker_stats& stats_;
+#endif
 };
 
 /// @}
