@@ -26,7 +26,11 @@
 
 namespace caf {
 
-#ifdef CAF_ENABLE_INSTRUMENTATION
+#if defined(CAF_ENABLE_INSTRUMENTATION) && !defined(__APPLE__)
+/* using this clock leads to non standard assumption that breaks on MacOS.
+   high_resolution_clock is not required to have to_time_t.  Only system_clock has.
+   Let's be practical.  std::chrono::system_clock is good enough in practice.
+ */
 using clock_source = std::chrono::high_resolution_clock;
 #else
 using clock_source = std::chrono::system_clock;
