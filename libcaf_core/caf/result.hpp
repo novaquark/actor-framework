@@ -156,11 +156,53 @@ public:
 };
 
 template <>
-struct result<unit_t> : result<void> {
+struct result<caf::unit_t> {
+public:
+  result() : flag(rt_value) {
+    // nop
+  }
 
-  using super = result<void>;
+  result(const unit_t&) : flag(rt_value) {
+    // nop
+  }
 
-  using super::super;
+  template <class E, class = enable_if_has_make_error_t<E>>
+  result(E x) : flag(rt_error), err(make_error(x)) {
+    // nop
+  }
+
+  result(error x) : flag(rt_error), err(std::move(x)) {
+    // nop
+  }
+
+  result(expected<caf::unit_t> x) {
+    if (x) {
+      flag = rt_value;
+    } else {
+      flag = rt_error;
+      err = std::move(x.error());
+    }
+  }
+
+  result(skip_t) : flag(rt_skip) {
+    // nop
+  }
+
+  result(delegated<void>) : flag(rt_delegated) {
+    // nop
+  }
+
+  result(const typed_response_promise<caf::unit_t>&) : flag(rt_delegated) {
+    // nop
+  }
+
+  result(const response_promise&) : flag(rt_delegated) {
+    // nop
+  }
+
+  result_runtime_type flag;
+  message value;
+  error err;
 };
 
 template <class T>
