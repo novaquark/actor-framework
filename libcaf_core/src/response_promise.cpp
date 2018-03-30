@@ -66,7 +66,7 @@ response_promise response_promise::deliver_impl(message msg) {
   if (!stages_.empty()) {
     auto next = std::move(stages_.back());
     stages_.pop_back();
-    next->enqueue(make_mailbox_element(std::move(source_), id_,
+    next->enqueue(make_mailbox_element(std::move(source_), id_, {},
                                        std::move(stages_), std::move(msg)),
                   context());
     return *this;

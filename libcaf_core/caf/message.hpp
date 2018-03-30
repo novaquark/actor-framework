@@ -39,6 +39,10 @@
 #include "caf/detail/message_data.hpp"
 #include "caf/detail/implicit_conversions.hpp"
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+#include <opentracing/tracer.h>
+#endif
+
 namespace caf {
 class message_handler;
 
@@ -330,6 +334,11 @@ private:
   static message concat_impl(std::initializer_list<data_ptr> xs);
 
   data_ptr vals_;
+
+#ifdef CAF_ENABLE_INSTRUMENTATION
+public:
+  std::shared_ptr<opentracing::Span> span_;
+#endif
 };
 
 /// @relates message

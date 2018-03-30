@@ -38,6 +38,8 @@
 #include "caf/detail/tuple_vals.hpp"
 #include "caf/detail/type_erased_tuple_view.hpp"
 
+#include <iostream>
+
 namespace caf {
 
 class mailbox_element : public memory_managed, public message_view {
@@ -66,6 +68,11 @@ public:
 #ifdef CAF_ENABLE_INSTRUMENTATION
   /// When was this mailbox_element created?
   timestamp ts = make_timestamp();
+
+  virtual std::shared_ptr<opentracing::Span> span() {
+    assert(false);
+    return {};
+  };
 #endif
 
   mailbox_element();
@@ -110,11 +117,13 @@ class mailbox_element_vals
       public detail::tuple_vals_impl<type_erased_tuple, Ts...> {
 public:
   template <class... Us>
-  mailbox_element_vals(strong_actor_ptr&& x0, message_id x1,
+  mailbox_element_vals(strong_actor_ptr&& x0, message_id x1, const std::shared_ptr<opentracing::Span>& span,
                        forwarding_stack&& x2, Us&&... xs)
       : mailbox_element(std::move(x0), x1, std::move(x2)),
-        detail::tuple_vals_impl<type_erased_tuple, Ts...>(std::forward<Us>(xs)...) {
+        detail::tuple_vals_impl<type_erased_tuple, Ts...>(std::forward<Us>(xs)...),
+        span_(span) {
     // nop
+    std::cout << "Building mailbox_element_vals with span " << span << std::endl;
   }
 
   type_erased_tuple& content() override {
@@ -136,6 +145,14 @@ public:
   void dispose() noexcept {
     this->deref();
   }
+
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  std::shared_ptr<opentracing::Span> span_;
+  virtual std::shared_ptr<opentracing::Span> span() override {
+    std::cout << "reading span() from mailbox_element_vals" << std::endl;
+    return span_;
+  }
+#endif
 };
 
 /// Provides a view for treating arbitrary data as message element.
@@ -172,7 +189,7 @@ using mailbox_element_ptr = std::unique_ptr<mailbox_element, detail::disposer>;
 
 /// @relates mailbox_element
 mailbox_element_ptr
-make_mailbox_element(strong_actor_ptr sender, message_id id,
+make_mailbox_element(strong_actor_ptr sender, message_id id, const std::shared_ptr<opentracing::Span>& span,
                      mailbox_element::forwarding_stack stages, message msg);
 
 /// @relates mailbox_element
@@ -182,7 +199,7 @@ typename std::enable_if<
   || (sizeof...(Ts) > 0),
   mailbox_element_ptr
 >::type
-make_mailbox_element(strong_actor_ptr sender, message_id id,
+make_mailbox_element(strong_actor_ptr sender, message_id id, const std::shared_ptr<opentracing::Span>& span,
                      mailbox_element::forwarding_stack stages,
                      T&& x, Ts&&... xs) {
   using impl =
@@ -194,7 +211,7 @@ make_mailbox_element(strong_actor_ptr sender, message_id id,
         typename detail::strip_and_convert<Ts>::type
       >::type...
     >;
-  auto ptr = new impl(std::move(sender), id, std::move(stages),
+  auto ptr = new impl(std::move(sender), id, span, std::move(stages),
                       std::forward<T>(x), std::forward<Ts>(xs)...);
   return mailbox_element_ptr{ptr};
 }

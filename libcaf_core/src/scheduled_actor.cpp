@@ -16,6 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
+#include <caf/scheduled_actor.hpp>
 #include "caf/scheduled_actor.hpp"
 
 #include "caf/config.hpp"
@@ -346,13 +347,13 @@ scheduled_actor::categorize(mailbox_element& x) {
         if (what == "info") {
           CAF_LOG_DEBUG("reply to 'info' message");
           x.sender->enqueue(
-            make_mailbox_element(ctrl(), x.mid.response_id(),
+            make_mailbox_element(ctrl(), x.mid.response_id(), {},
                                   {}, ok_atom::value, std::move(what),
                                   strong_actor_ptr{ctrl()}, name()),
             context());
         } else {
           x.sender->enqueue(
-            make_mailbox_element(ctrl(), x.mid.response_id(),
+            make_mailbox_element(ctrl(), x.mid.response_id(), {},
                                   {}, sec::unsupported_sys_key),
             context());
         }
@@ -735,19 +736,19 @@ bool scheduled_actor::add_source(const stream_manager_ptr& mgr,
                          opn.redeployable, std::move(result_cb));
 }
 
-# ifdef CAF_ENABLE_INSTRUMENTATION
-  void scheduled_actor::record_response(message_id mid) {
-    if (context() != nullptr) {
-      auto rp_time = responses_times_.find(mid);
-      if (rp_time != responses_times_.end()) {
-        auto req_wait_time = timestamp_ago_ns(rp_time->second.first);
-        if (allow_individual_instrumentation()) {
-          context()->stats().record_request_individual(instrumentation::get_instrumented_actor_id(*this), rp_time->second.second, req_wait_time);
-        } else {
-          context()->stats().record_request_aggregate(typeid(*this), rp_time->second.second, req_wait_time);
-        }
-      }
+#ifdef CAF_ENABLE_INSTRUMENTATION
+void scheduled_actor::record_response(message_id mid) {
+  if (context() != nullptr) {
+    const auto it = requests_in_progress_.find(mid);
+    if (it != requests_in_progress_.cend()) {
+      auto req_wait_time = timestamp_ago_ns(it->second.ts);
+      context()->stats().record_request_aggregate(typeid(*this), it->second.msgtype, req_wait_time);
+      it->second.span->SetTag("actor_id", id());
+      it->second.span->Finish();
+      requests_in_progress_.erase(it);
     }
   }
-# endif
+}
+#endif
+
 } // namespace caf

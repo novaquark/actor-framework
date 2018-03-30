@@ -184,7 +184,7 @@ public:
   /// Sends an exit message to `dest`.
   template <class ActorHandle>
   void send_exit(const ActorHandle& dest, error reason) {
-    dest->eq_impl(make_message_id(), ctrl(), context(),
+    dest->eq_impl(make_message_id(), {}, ctrl(), context(),
                   exit_msg{address(), std::move(reason)});
   }
 
@@ -398,7 +398,7 @@ public:
                             ? mid.with_high_priority()
                             : mid.with_normal_priority();
     dest->enqueue(make_mailbox_element(std::move(current_element_->sender),
-                                       mid, std::move(current_element_->stages),
+                                       mid, {}, std::move(current_element_->stages),
                                        std::forward<Ts>(xs)...),
                   context());
     return {};
@@ -426,7 +426,23 @@ public:
   /// Appends `x` to the cache for later consumption.
   void push_to_cache(mailbox_element_ptr ptr);
 
-# ifdef CAF_ENABLE_INSTRUMENTATION
+#ifdef CAF_ENABLE_INSTRUMENTATION
+
+  timestamp current_message_ts() const {
+    CAF_ASSERT(current_element_);
+    return current_element_->ts;
+  }
+
+  size_t mailbox_cached_count() const {
+    return mailbox_.cached_count();
+  }
+
+  std::shared_ptr<opentracing::Span> current_span() const {
+    if (current_element_ == nullptr)
+      return {};
+    return current_element_->span();
+  }
+
   virtual bool allow_individual_instrumentation() const {
     return false;
   }
@@ -442,7 +458,9 @@ public:
       }
     }
   }
+
 #endif // CAF_ENABLE_INSTRUMENTATION
+
 protected:
   // -- member variables -------------------------------------------------------
 
@@ -453,7 +471,7 @@ protected:
   execution_unit* context_;
 
   // pointer to the sender of the currently processed message
-  mailbox_element* current_element_;
+  mailbox_element* current_element_ = nullptr;
 
   // last used request ID
   message_id last_request_id_;

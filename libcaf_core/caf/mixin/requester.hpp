@@ -39,10 +39,11 @@ template <class T>
 struct is_blocking_requester : std::false_type { };
 
 #ifdef CAF_ENABLE_INSTRUMENTATION
+
 template <bool isBlocking>
 struct instrument_helper {
     template <class Type, class... Ts>
-    static void register_request(Type*, message_id, const Ts&...) {
+    static void register_request(Type*, message_id, const std::shared_ptr<opentracing::Span>&, const Ts&...) {
       // nop
     }
 };
@@ -50,10 +51,11 @@ struct instrument_helper {
 template <>
 struct instrument_helper<false> {
  template <class Type, class... Ts>
- static void register_request(Type* actor, message_id id, const Ts&... xs) {
-   actor->register_request(id, xs...);
+ static void register_request(Type* actor, message_id id, const std::shared_ptr<opentracing::Span>& span, const Ts&... xs) {
+   actor->register_request(id, span, xs...);
  }
 };
+
 #endif // CAF_ENABLE_INSTRUMENTATION
 
 /// A `requester` is an actor that supports
@@ -99,15 +101,23 @@ public:
     auto dptr = static_cast<Subtype*>(this);
     auto req_id = dptr->new_request_id(P);
     if (dest) {
-# ifdef CAF_ENABLE_INSTRUMENTATION
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      std::shared_ptr<opentracing::Span> span;
+      auto tracer = opentracing::Tracer::Global();
+      auto span_name = instrumentation::to_string(typeid(*dptr)) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
+      if (dptr->current_span()) {
+        span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(&dptr->current_span()->context())});
+      } else {
+        span = tracer->StartSpan(std::move(span_name));
+      }
       instrument_helper<is_blocking_requester<Subtype>::value>
-                       ::register_request(dptr, req_id.response_id(), xs...);
-# endif
-      dest->eq_impl(req_id, dptr->ctrl(), dptr->context(),
+                       ::register_request(dptr, req_id.response_id(), span, xs...);
+#endif
+      dest->eq_impl(req_id, std::move(span), dptr->ctrl(), dptr->context(),
                     std::forward<Ts>(xs)...);
       dptr->request_response_timeout(timeout, req_id);
     } else {
-      dptr->eq_impl(req_id.response_id(), dptr->ctrl(), dptr->context(),
+      dptr->eq_impl(req_id.response_id(), dptr->current_span(), dptr->ctrl(), dptr->context(),
                     make_error(sec::invalid_argument));
     }
     return {req_id.response_id(), dptr};

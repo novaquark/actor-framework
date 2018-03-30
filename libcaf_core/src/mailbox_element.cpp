@@ -18,6 +18,8 @@
 
 #include "caf/mailbox_element.hpp"
 
+#include <iostream>
+
 namespace caf {
 
 namespace {
@@ -46,6 +48,13 @@ public:
   message copy_content_to_message() const override {
     return msg_;
   }
+
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  virtual std::shared_ptr<opentracing::Span> span() override {
+    std::cout << "reading span() from mailbox_element_wrapper" << std::endl;
+    return msg_.span_;
+  }
+#endif
 
 private:
   /// Stores the content of this mailbox element.
@@ -93,9 +102,10 @@ const type_erased_tuple& mailbox_element::content() const {
 }
 
 mailbox_element_ptr make_mailbox_element(strong_actor_ptr sender, message_id id,
+                                         const std::shared_ptr<opentracing::Span>& span,
                                          mailbox_element::forwarding_stack stages,
                                          message msg) {
-  auto ptr = new mailbox_element_wrapper(std::move(sender), id,
+  auto ptr = new mailbox_element_wrapper(std::move(sender), id, // TODO span in wrapper too?
                                          std::move(stages), std::move(msg));
   return mailbox_element_ptr{ptr};
 }

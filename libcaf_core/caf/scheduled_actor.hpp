@@ -55,6 +55,11 @@
 
 #include "caf/logger.hpp"
 
+#ifdef CAF_ENABLE_INSTRUMENTATION
+#include <memory>
+#include <opentracing/tracer.h>
+#endif
+
 namespace caf {
 
 // -- related free functions ---------------------------------------------------
@@ -191,16 +196,6 @@ public:
   /// Returns a factory for proxies created
   /// and managed by this actor or `nullptr`.
   virtual proxy_registry* proxy_registry_ptr();
-
-#ifdef CAF_ENABLE_INSTRUMENTATION
-  timestamp& current_message_ts() const {
-    return current_element_->ts;
-  }
-
-  size_t mailbox_cached_count() const {
-    return mailbox_.cached_count();
-  }
-#endif
 
   // -- state modifiers --------------------------------------------------------
 
@@ -810,16 +805,18 @@ public:
     if (!ignore_mid)
       mptr->mid.mark_as_answered();
   }
-# ifdef CAF_ENABLE_INSTRUMENTATION
+#ifdef CAF_ENABLE_INSTRUMENTATION
   template <class... Ts>
-  void register_request(message_id mid, const Ts&... xs) {
+  void register_request(message_id mid, const std::shared_ptr<opentracing::Span>& span, const Ts&... xs) {
     if (context() != nullptr) {
       auto cid = instrumentation::get_msgtype(xs...);
-      responses_times_.emplace(mid, std::make_pair(make_timestamp(), cid));
+      auto tracer = opentracing::Tracer::Global();
+      std::cout << "register_request with span " << span << std::endl;
+      requests_in_progress_.emplace(mid, request_data{make_timestamp(), cid, span});
     }
   }
   void record_response(message_id mid);
-# endif // CAF_ENABLE_INSTRUMENTATION
+#endif
   /// @endcond
 
 protected:
@@ -896,8 +893,12 @@ protected:
 # endif // CAF_NO_EXCEPTIONS
 
 # ifdef CAF_ENABLE_INSTRUMENTATION
-  using timed_response = std::pair<timestamp, instrumentation::msgtype_id>;
-  std::unordered_map<message_id, timed_response>   responses_times_;
+  struct request_data {
+    timestamp                          ts;
+    instrumentation::msgtype_id        msgtype;
+    std::shared_ptr<opentracing::Span> span;
+  };
+  std::unordered_map<message_id, request_data> requests_in_progress_;
 # endif // CAF_ENABLE_INSTRUMENTATION
   /// @endcond
 };

@@ -109,9 +109,10 @@ public:
   /// @cond PRIVATE
 
   template <class... Ts>
-  void eq_impl(message_id mid, strong_actor_ptr sender,
+  void eq_impl(message_id mid, const std::shared_ptr<opentracing::Span>&, strong_actor_ptr sender,
                execution_unit* ctx, Ts&&... xs) const {
     CAF_ASSERT(!mid.is_request());
+    // TODO span?
     if (ptr_)
       ptr_->enqueue(std::move(sender), mid,
                     make_message(std::forward<Ts>(xs)...), ctx);

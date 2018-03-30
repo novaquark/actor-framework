@@ -114,9 +114,9 @@ public:
   /// @cond PRIVATE
 
   template <class... Ts>
-  void eq_impl(message_id mid, strong_actor_ptr sender,
+  void eq_impl(message_id mid, const std::shared_ptr<opentracing::Span>& span, strong_actor_ptr sender,
                execution_unit* ctx, Ts&&... xs) {
-    enqueue(make_mailbox_element(std::move(sender), mid,
+    enqueue(make_mailbox_element(std::move(sender), mid, span,
                                  {}, std::forward<Ts>(xs)...),
             ctx);
   }

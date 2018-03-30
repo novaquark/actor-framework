@@ -67,7 +67,7 @@ void outbound_path::emit_open(strong_actor_ptr origin,
   cd = client_data{origin, handshake_mid};
   redeployable = is_redeployable;
   hdl->enqueue(
-    make_mailbox_element(std::move(origin), handshake_mid, std::move(stages),
+    make_mailbox_element(std::move(origin), handshake_mid, {}, std::move(stages),
                          make_message(make<stream_msg::open>(
                            sid, self->address(), std::move(handshake_data),
                            self->ctrl(), hdl, prio, is_redeployable))),

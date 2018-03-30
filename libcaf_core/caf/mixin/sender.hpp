@@ -77,13 +77,13 @@ public:
                        typename res_t::type
                      >::valid,
                   "this actor does not accept the response message");
-# ifdef CAF_ENABLE_INSTRUMENTATION
-    if (dest)
-      static_cast<Subtype*>(this)->record_send(xs...);
-# endif // CAF_ENABLE_INSTRUMENTATION
-    if (dest)
-      dest->eq_impl(make_message_id(P), dptr()->ctrl(),
-                    dptr()->context(), std::forward<Ts>(xs)...);
+    if (dest) {
+#ifdef CAF_ENABLE_INSTRUMENTATION
+        static_cast<Subtype*>(this)->record_send(xs...);
+#endif
+        dest->eq_impl(make_message_id(P), {}, dptr()->ctrl(), // TODO propagate span here
+                      dptr()->context(), std::forward<Ts>(xs)...);
+    }
   }
 
   template <message_priority P = message_priority::normal,
@@ -101,7 +101,7 @@ public:
                   >::valid,
                   "receiver does not accept given message");
     if (dest)
-      dest->eq_impl(make_message_id(P), nullptr,
+      dest->eq_impl(make_message_id(P), {}, nullptr,
                     dptr()->context(), std::forward<Ts>(xs)...);
   }
 
@@ -150,7 +150,7 @@ public:
     if (dest) {
       auto& clock = dptr()->system().clock();
       auto t = clock.now() + rtime;
-      auto me = make_mailbox_element(dptr()->ctrl(), make_message_id(P),
+      auto me = make_mailbox_element(dptr()->ctrl(), make_message_id(P), {},
                                      no_stages, std::forward<Ts>(xs)...);
       clock.schedule_message(t, actor_cast<strong_actor_ptr>(dest),
                              std::move(me));
