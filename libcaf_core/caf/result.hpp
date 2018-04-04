@@ -31,185 +31,161 @@
 
 namespace caf {
 
-enum result_runtime_type {
-  rt_value,
-  rt_error,
-  rt_delegated,
-  rt_skip
-};
+    enum result_runtime_type {
+        rt_value,
+        rt_error,
+        rt_delegated,
+        rt_skip
+    };
 
-template <class... Ts>
-class result {
-public:
-  result(Ts... xs) : flag(rt_value), value(make_message(std::move(xs)...)) {
-    // nop
-  }
+    template <class... Ts>
+    class result {
+    public:
+        result(Ts... xs) : flag(rt_value), value(make_message(std::move(xs)...)) {
+            // nop
+        }
 
-  template <class U, class... Us>
-  result(U x, Us... xs) : flag(rt_value) {
-    init(std::move(x), std::move(xs)...);
-  }
+        template <class U, class... Us>
+        result(U x, Us... xs) : flag(rt_value) {
+            init(std::move(x), std::move(xs)...);
+        }
 
-  template <class E, class = enable_if_has_make_error_t<E>>
-  result(E x) : flag(rt_error), err(make_error(x)) {
-    // nop
-  }
+        template <class E, class = enable_if_has_make_error_t<E>>
+        result(E x) : flag(rt_error), err(make_error(x)) {
+            // nop
+        }
 
-  result(error x) : flag(rt_error), err(std::move(x)) {
-    // nop
-  }
+        result(error x) : flag(rt_error), err(std::move(x)) {
+            // nop
+        }
 
-  template <
-    class T,
-    class = typename std::enable_if<
-      sizeof...(Ts) == 1
-      && std::is_convertible<
-           T,
-           detail::tl_head_t<detail::type_list<Ts...>>
-         >::value
-    >::type
-  >
-  result(expected<T> x) {
-    if (x) {
-      flag = rt_value;
-      init(std::move(*x));
-    } else {
-      flag = rt_error;
-      err = std::move(x.error());
-    }
-  }
+        template <
+                class T,
+                class = typename std::enable_if<
+                        sizeof...(Ts) == 1
+                        && std::is_convertible<
+                                T,
+                                detail::tl_head_t<detail::type_list<Ts...>>
+                        >::value
+                >::type
+        >
+        result(expected<T> x) {
+            if (x) {
+                flag = rt_value;
+                init(std::move(*x));
+            } else {
+                flag = rt_error;
+                err = std::move(x.error());
+            }
+        }
 
-  result(skip_t) : flag(rt_skip) {
-    // nop
-  }
+        result(skip_t) : flag(rt_skip) {
+            // nop
+        }
 
-  result(delegated<Ts...>) : flag(rt_delegated) {
-    // nop
-  }
+        result(delegated<Ts...>) : flag(rt_delegated) {
+            // nop
+        }
 
-  result(const typed_response_promise<Ts...>&) : flag(rt_delegated) {
-    // nop
-  }
+        result(const typed_response_promise<Ts...>&) : flag(rt_delegated) {
+            // nop
+        }
 
-  result(const response_promise&) : flag(rt_delegated) {
-    // nop
-  }
+        result(const response_promise&) : flag(rt_delegated) {
+            // nop
+        }
 
-  result_runtime_type flag;
-  message value;
-  error err;
+        result_runtime_type flag;
+        message value;
+        error err;
 
-private:
-  void init(Ts... xs) {
-    value = make_message(std::move(xs)...);
-  }
-};
+    private:
+        void init(Ts... xs) {
+            value = make_message(std::move(xs)...);
+        }
+    };
 
-template <>
-struct result<void> {
-public:
-  result() : flag(rt_value) {
-    // nop
-  }
+    template <>
+    struct result<void> {
+    public:
+        result() : flag(rt_value) {
+            // nop
+        }
 
-  result(const unit_t&) : flag(rt_value) {
-    // nop
-  }
+        result(const unit_t&) : flag(rt_value) {
+            // nop
+        }
 
-  template <class E, class = enable_if_has_make_error_t<E>>
-  result(E x) : flag(rt_error), err(make_error(x)) {
-    // nop
-  }
+        template <class E, class = enable_if_has_make_error_t<E>>
+        result(E x) : flag(rt_error), err(make_error(x)) {
+            // nop
+        }
 
-  result(error x) : flag(rt_error), err(std::move(x)) {
-    // nop
-  }
+        result(error x) : flag(rt_error), err(std::move(x)) {
+            // nop
+        }
 
-  result(expected<void> x) {
-    if (x) {
-      flag = rt_value;
-    } else {
-      flag = rt_error;
-      err = std::move(x.error());
-    }
-  }
+        result(expected<void> x) {
+            init(x);
+        }
 
-  result(skip_t) : flag(rt_skip) {
-    // nop
-  }
+        result(expected<unit_t> x) {
+            init(x);
+        }
 
-  result(delegated<void>) : flag(rt_delegated) {
-    // nop
-  }
+        result(skip_t) : flag(rt_skip) {
+            // nop
+        }
 
-  result(const typed_response_promise<void>&) : flag(rt_delegated) {
-    // nop
-  }
+        result(delegated<void>) : flag(rt_delegated) {
+            // nop
+        }
 
-  result(const response_promise&) : flag(rt_delegated) {
-    // nop
-  }
+        result(delegated<unit_t>) : flag(rt_delegated) {
+            // nop
+        }
 
-  result_runtime_type flag;
-  message value;
-  error err;
-};
+        result(const typed_response_promise<void>&) : flag(rt_delegated) {
+            // nop
+        }
 
-template <>
-struct result<caf::unit_t> {
-public:
-  result() : flag(rt_value) {
-    // nop
-  }
+        result(const typed_response_promise<unit_t>&) : flag(rt_delegated) {
+            // nop
+        }
 
-  result(const unit_t&) : flag(rt_value) {
-    // nop
-  }
+        result(const response_promise&) : flag(rt_delegated) {
+            // nop
+        }
 
-  template <class E, class = enable_if_has_make_error_t<E>>
-  result(E x) : flag(rt_error), err(make_error(x)) {
-    // nop
-  }
+        result_runtime_type flag;
+        message value;
+        error err;
 
-  result(error x) : flag(rt_error), err(std::move(x)) {
-    // nop
-  }
+    private:
+        template <class T>
+        void init(T& x) {
+            if (x) {
+                flag = rt_value;
+            } else {
+                flag = rt_error;
+                err = std::move(x.error());
+            }
+        }
+    };
 
-  result(expected<caf::unit_t> x) {
-    if (x) {
-      flag = rt_value;
-    } else {
-      flag = rt_error;
-      err = std::move(x.error());
-    }
-  }
+//    template <>
+//    struct result<unit_t> : result<void> {
+//
+//        using super = result<void>;
+//
+//        using super::super;
+//    };
 
-  result(skip_t) : flag(rt_skip) {
-    // nop
-  }
+    template <class T>
+    struct is_result : std::false_type {};
 
-  result(delegated<void>) : flag(rt_delegated) {
-    // nop
-  }
-
-  result(const typed_response_promise<caf::unit_t>&) : flag(rt_delegated) {
-    // nop
-  }
-
-  result(const response_promise&) : flag(rt_delegated) {
-    // nop
-  }
-
-  result_runtime_type flag;
-  message value;
-  error err;
-};
-
-template <class T>
-struct is_result : std::false_type {};
-
-template <class... Ts>
-struct is_result<result<Ts...>> : std::true_type {};
+    template <class... Ts>
+    struct is_result<result<Ts...>> : std::true_type {};
 
 } // namespace caf
 
