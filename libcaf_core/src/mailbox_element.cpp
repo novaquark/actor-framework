@@ -49,12 +49,10 @@ public:
     return msg_;
   }
 
-#ifdef CAF_ENABLE_INSTRUMENTATION
-  virtual std::shared_ptr<opentracing::Span> span() override {
-    std::cout << "reading span() from mailbox_element_wrapper" << std::endl;
-    return msg_.span_;
+  virtual message_metadata metadata() const override {
+    std::cout << "reading " << msg_.metadata_ << " from mailbox_element_wrapper" << std::endl;
+    return msg_.metadata_;
   }
-#endif
 
 private:
   /// Stores the content of this mailbox element.
@@ -102,10 +100,11 @@ const type_erased_tuple& mailbox_element::content() const {
 }
 
 mailbox_element_ptr make_mailbox_element(strong_actor_ptr sender, message_id id,
-                                         const std::shared_ptr<opentracing::Span>& span,
+                                         const message_metadata& metadata,
                                          mailbox_element::forwarding_stack stages,
                                          message msg) {
-  auto ptr = new mailbox_element_wrapper(std::move(sender), id, // TODO span in wrapper too?
+  // TODO do something with metadata? can it be different from the one in msg?
+  auto ptr = new mailbox_element_wrapper(std::move(sender), id,
                                          std::move(stages), std::move(msg));
   return mailbox_element_ptr{ptr};
 }

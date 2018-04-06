@@ -68,12 +68,12 @@ public:
 #ifdef CAF_ENABLE_INSTRUMENTATION
   /// When was this mailbox_element created?
   timestamp ts = make_timestamp();
+#endif
 
-  virtual std::shared_ptr<opentracing::Span> span() {
+  virtual message_metadata metadata() const {
     assert(false);
     return {};
   };
-#endif
 
   mailbox_element();
 
@@ -117,13 +117,13 @@ class mailbox_element_vals
       public detail::tuple_vals_impl<type_erased_tuple, Ts...> {
 public:
   template <class... Us>
-  mailbox_element_vals(strong_actor_ptr&& x0, message_id x1, const std::shared_ptr<opentracing::Span>& span,
+  mailbox_element_vals(strong_actor_ptr&& x0, message_id x1, const message_metadata& metadata,
                        forwarding_stack&& x2, Us&&... xs)
       : mailbox_element(std::move(x0), x1, std::move(x2)),
         detail::tuple_vals_impl<type_erased_tuple, Ts...>(std::forward<Us>(xs)...),
-        span_(span) {
+        metadata_(metadata) {
     // nop
-    std::cout << "Building mailbox_element_vals with span " << span << std::endl;
+    std::cout << "Building mailbox_element_vals with " << metadata << std::endl;
   }
 
   type_erased_tuple& content() override {
@@ -133,26 +133,28 @@ public:
   message move_content_to_message() override {
     message_factory f;
     auto& xs = this->data();
-    return detail::apply_moved_args(f, detail::get_indices(xs), xs);
+    auto msg = detail::apply_moved_args(f, detail::get_indices(xs), xs);
+    msg.metadata_ = this->metadata();
+    return msg;
   }
 
   message copy_content_to_message() const override {
     message_factory f;
     auto& xs = this->data();
-    return detail::apply_args(f, detail::get_indices(xs), xs);
+    auto msg = detail::apply_args(f, detail::get_indices(xs), xs);
+    msg.metadata_ = this->metadata();
+    return msg;
   }
 
   void dispose() noexcept {
     this->deref();
   }
 
-#ifdef CAF_ENABLE_INSTRUMENTATION
-  std::shared_ptr<opentracing::Span> span_;
-  virtual std::shared_ptr<opentracing::Span> span() override {
-    std::cout << "reading span() from mailbox_element_vals" << std::endl;
-    return span_;
+  message_metadata metadata_;
+  virtual message_metadata metadata() const override {
+    std::cout << "reading " << metadata_ << " from mailbox_element_vals" << std::endl;
+    return metadata_;
   }
-#endif
 };
 
 /// Provides a view for treating arbitrary data as message element.
@@ -174,13 +176,17 @@ public:
   message move_content_to_message() override {
     message_factory f;
     auto& xs = this->data();
-    return detail::apply_moved_args(f, detail::get_indices(xs), xs);
+    auto msg = detail::apply_moved_args(f, detail::get_indices(xs), xs);
+    msg.metadata_ = this->metadata();
+    return msg;
   }
 
   message copy_content_to_message() const override {
     message_factory f;
     auto& xs = this->data();
-    return detail::apply_args(f, detail::get_indices(xs), xs);
+    auto msg = detail::apply_args(f, detail::get_indices(xs), xs);
+    msg.metadata_ = this->metadata();
+    return msg;
   }
 };
 
@@ -189,7 +195,7 @@ using mailbox_element_ptr = std::unique_ptr<mailbox_element, detail::disposer>;
 
 /// @relates mailbox_element
 mailbox_element_ptr
-make_mailbox_element(strong_actor_ptr sender, message_id id, const std::shared_ptr<opentracing::Span>& span,
+make_mailbox_element(strong_actor_ptr sender, message_id id, const message_metadata& metadata,
                      mailbox_element::forwarding_stack stages, message msg);
 
 /// @relates mailbox_element
@@ -199,7 +205,7 @@ typename std::enable_if<
   || (sizeof...(Ts) > 0),
   mailbox_element_ptr
 >::type
-make_mailbox_element(strong_actor_ptr sender, message_id id, const std::shared_ptr<opentracing::Span>& span,
+make_mailbox_element(strong_actor_ptr sender, message_id id, const message_metadata& metadata,
                      mailbox_element::forwarding_stack stages,
                      T&& x, Ts&&... xs) {
   using impl =
@@ -211,7 +217,7 @@ make_mailbox_element(strong_actor_ptr sender, message_id id, const std::shared_p
         typename detail::strip_and_convert<Ts>::type
       >::type...
     >;
-  auto ptr = new impl(std::move(sender), id, span, std::move(stages),
+  auto ptr = new impl(std::move(sender), id, metadata, std::move(stages),
                       std::forward<T>(x), std::forward<Ts>(xs)...);
   return mailbox_element_ptr{ptr};
 }

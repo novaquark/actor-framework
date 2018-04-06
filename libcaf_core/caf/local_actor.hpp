@@ -437,12 +437,6 @@ public:
     return mailbox_.cached_count();
   }
 
-  std::shared_ptr<opentracing::Span> current_span() const {
-    if (current_element_ == nullptr)
-      return {};
-    return current_element_->span();
-  }
-
   virtual bool allow_individual_instrumentation() const {
     return false;
   }
@@ -460,6 +454,12 @@ public:
   }
 
 #endif // CAF_ENABLE_INSTRUMENTATION
+
+  message_metadata current_metadata() const {
+    if (current_element_ == nullptr)
+      return {};
+    return current_element_->metadata();
+  }
 
 protected:
   // -- member variables -------------------------------------------------------

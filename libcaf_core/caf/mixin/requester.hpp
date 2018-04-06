@@ -102,22 +102,24 @@ public:
     auto req_id = dptr->new_request_id(P);
     if (dest) {
 #ifdef CAF_ENABLE_INSTRUMENTATION
-      std::shared_ptr<opentracing::Span> span;
+      message_metadata metadata = metadata_new();
       auto tracer = opentracing::Tracer::Global();
       auto span_name = instrumentation::to_string(typeid(*dptr)) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
-      if (dptr->current_span()) {
-        span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(&dptr->current_span()->context())});
+      if (dptr->current_metadata().span) {
+        std::cout << "Generating metadata " << metadata << " with span (" << span_name << ") child of " << dptr->current_metadata() << std::endl;
+        metadata.span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(&dptr->current_metadata().span->context())});
       } else {
-        span = tracer->StartSpan(std::move(span_name));
+        std::cout << "Starting metadata " << metadata << " with span (" << span_name << ") root for " << dptr->current_metadata() << std::endl;
+        metadata.span = tracer->StartSpan(std::move(span_name));
       }
       instrument_helper<is_blocking_requester<Subtype>::value>
-                       ::register_request(dptr, req_id.response_id(), span, xs...);
+                       ::register_request(dptr, req_id.response_id(), metadata.span, xs...);
 #endif
-      dest->eq_impl(req_id, std::move(span), dptr->ctrl(), dptr->context(),
+      dest->eq_impl(req_id, std::move(metadata), dptr->ctrl(), dptr->context(),
                     std::forward<Ts>(xs)...);
       dptr->request_response_timeout(timeout, req_id);
     } else {
-      dptr->eq_impl(req_id.response_id(), dptr->current_span(), dptr->ctrl(), dptr->context(),
+      dptr->eq_impl(req_id.response_id(), dptr->current_metadata(), dptr->ctrl(), dptr->context(),
                     make_error(sec::invalid_argument));
     }
     return {req_id.response_id(), dptr};

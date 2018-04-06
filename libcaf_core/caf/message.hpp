@@ -31,6 +31,7 @@
 #include "caf/optional.hpp"
 #include "caf/make_counted.hpp"
 #include "caf/index_mapping.hpp"
+#include "caf/message_metadata.hpp"
 
 #include "caf/detail/int_list.hpp"
 #include "caf/detail/apply_args.hpp"
@@ -335,10 +336,8 @@ private:
 
   data_ptr vals_;
 
-#ifdef CAF_ENABLE_INSTRUMENTATION
 public:
-  std::shared_ptr<opentracing::Span> span_;
-#endif
+  message_metadata metadata_;
 };
 
 /// @relates message

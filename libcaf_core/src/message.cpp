@@ -422,6 +422,22 @@ error inspect(serializer& sink, message& msg) {
     tname += *ptr;
   }
   auto save_loop = [&]() -> error {
+    if (msg.get_as<int>(1) == 42) {
+      std::cout << "   (this is the one!)" << std::endl;
+    }
+    if (msg.metadata_.span) {
+      std::cout << "   Serializing caf::message " << msg.metadata_ << " WITH span: " << msg.content().stringify() << std::endl;
+      sink(true);
+      auto& tracer = msg.metadata_.span->tracer();
+      auto& context = msg.metadata_.span->context();
+      std::ostringstream os;
+      tracer.Inject(context, os);
+      sink(os.str());
+    } else {
+      std::cout << "   Serializing caf::message " << msg.metadata_ << " without span:" << std::endl;
+      std::cout << "       " << msg.content().stringify() << std::endl;
+      sink(false);
+    }
     for (size_t i = 0; i < n; ++i) {
       auto e = msg.cvals()->save(i, sink);
       if (e)
@@ -451,6 +467,17 @@ error inspect(deserializer& source, message& msg) {
   }
   if (tname.compare(0, 4, "@<>+") != 0)
     return sec::unknown_type;
+  // decode transmitted span
+  bool has_span;
+  source(has_span);
+  if (has_span) {
+    std::cout << "   Deserializing caf::message WITH span" << std::endl;
+    std::string encoded_span;
+    source(encoded_span);
+  } else {
+    std::cout << "   Deserializing caf::message without span" << std::endl;
+//    std::cout << "       " << msg.content().stringify() << std::endl;
+  }
   // iterate over concatenated type names
   auto eos = tname.end();
   auto next = [&](std::string::iterator iter) {

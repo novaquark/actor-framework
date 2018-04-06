@@ -115,7 +115,7 @@ struct message_factory {
 template <class... Ts>
 message make_message_from_tuple(std::tuple<Ts...> xs) {
   message_factory f;
-  return detail::apply_moved_args(f, detail::get_indices(xs), xs);
+  return detail::apply_moved_args(f, detail::get_indices(xs), xs); // TODO span
 }
 
 } // namespace caf
