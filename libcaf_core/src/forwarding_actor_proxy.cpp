@@ -47,13 +47,16 @@ void forwarding_actor_proxy::forward_msg(strong_actor_ptr sender,
     unlink_from(msg.get_as<exit_msg>(0).source);
   forwarding_stack tmp;
   shared_lock<detail::shared_spinlock> guard(mtx_);
-  if (broker_)
-    broker_->enqueue(nullptr, invalid_message_id,
-                     make_message(forward_atom::value, std::move(sender),
-                                  fwd != nullptr ? *fwd : tmp,
-                                  strong_actor_ptr{ctrl()}, mid,
-                                  std::move(msg)),
-                     nullptr);
+  if (broker_) {
+    std::cout << "Building forwarding message for " << msg.content().stringify() << " with metadata " << msg.metadata_ << std::endl;
+    auto metadata = msg.metadata_;
+    auto forwarding_msg = make_message(forward_atom::value, std::move(sender),
+                                       fwd != nullptr ? *fwd : tmp,
+                                       strong_actor_ptr{ctrl()}, mid,
+                                       std::move(msg));
+    forwarding_msg.metadata_ = std::move(metadata);
+    broker_->enqueue(nullptr, invalid_message_id, std::move(forwarding_msg), nullptr);
+  }
 }
 
 void forwarding_actor_proxy::enqueue(mailbox_element_ptr what,

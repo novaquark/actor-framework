@@ -315,9 +315,8 @@ void basp_broker_state::deliver(const node_id& src_nid, actor_id src_aid,
     return;
   }
   self->parent().notify<hook::message_received>(src_nid, src, dest, mid, msg);
-  // TODO TEMP std::cout << "BASP_BROKER enqueue " << to_string(msg) << " into mb of " << to_string(dest) << std::endl;
-  dest->enqueue(make_mailbox_element(std::move(src), mid, {}, std::move(stages),
-                                     std::move(msg)),
+  auto metadata = msg.metadata_;
+  dest->enqueue(make_mailbox_element(std::move(src), mid, std::move(metadata), std::move(stages), std::move(msg)),
                 nullptr);
 }
 

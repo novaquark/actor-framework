@@ -20,6 +20,8 @@
 #define CAF_MESSAGE_METADATA_HPP
 
 #include <memory>
+#include <atomic>
+#include <utility>
 #include <iostream>
 
 #include <opentracing/tracer.h>
@@ -30,6 +32,11 @@ namespace caf {
 struct message_metadata {
   uint64_t                           id;
   std::shared_ptr<opentracing::Span> span;
+
+  void swap(message_metadata& other) {
+    std::swap(id, other.id);
+    span.swap(other.span);
+  }
 };
 
 inline message_metadata metadata_new() {
@@ -38,7 +45,11 @@ inline message_metadata metadata_new() {
 }
 
 inline std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
-  s << "[metadata #" << std::to_string(p.id) << "]";
+  s << "[metadata #" << std::to_string(p.id);
+  if (p.span) {
+    s << " with span " << p.span;
+  }
+  s << "]";
   return s;
 }
 

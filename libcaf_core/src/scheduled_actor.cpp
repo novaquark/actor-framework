@@ -403,6 +403,7 @@ scheduled_actor::categorize(mailbox_element& x) {
 invoke_message_result scheduled_actor::consume(mailbox_element& x) {
   CAF_LOG_TRACE(CAF_ARG(x));
   current_element_ = &x;
+  std::cout << "Consume mailbox element with metadata " << x.metadata() << std::endl;
   CAF_LOG_RECEIVE_EVENT(current_element_);
   // Helper function for dispatching a message to a response handler.
   using ptr_t = scheduled_actor*;

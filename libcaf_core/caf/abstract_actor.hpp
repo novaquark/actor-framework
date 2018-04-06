@@ -116,6 +116,7 @@ public:
   template <class... Ts>
   void eq_impl(message_id mid, const message_metadata& metadata, strong_actor_ptr sender,
                execution_unit* ctx, Ts&&... xs) {
+    // TODO metadata could be movable &&
     enqueue(make_mailbox_element(std::move(sender), mid, metadata,
                                  {}, std::forward<Ts>(xs)...),
             ctx);

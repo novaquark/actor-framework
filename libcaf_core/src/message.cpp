@@ -21,6 +21,8 @@
 #include <iostream>
 #include <utility>
 #include <utility>
+// TODO TEMP
+#include <iomanip>
 
 #include "caf/serializer.hpp"
 #include "caf/actor_system.hpp"
@@ -39,7 +41,7 @@ message::message(none_t) noexcept {
   // nop
 }
 
-message::message(message&& other) noexcept : vals_(std::move(other.vals_)) {
+message::message(message&& other) noexcept : vals_(std::move(other.vals_)), metadata_(std::move(other.metadata_)) {
   // nop
 }
 
@@ -49,6 +51,7 @@ message::message(data_ptr ptr) noexcept : vals_(std::move(ptr)) {
 
 message& message::operator=(message&& other) noexcept {
   vals_.swap(other.vals_);
+  metadata_.swap(other.metadata_);
   return *this;
 }
 
@@ -62,6 +65,7 @@ void message::reset(raw_ptr new_ptr, bool add_ref) noexcept {
 
 void message::swap(message& other) noexcept {
   vals_.swap(other.vals_);
+  metadata_.swap(other.metadata_);
 }
 
 void* message::get_mutable(size_t p) {
@@ -86,12 +90,17 @@ message message::drop(size_t n) const {
   CAF_ASSERT(vals_);
   if (n == 0)
     return *this;
-  if (n >= size())
-    return message{};
+  if (n >= size()) {
+    auto empty = message{};
+    empty.metadata_ = metadata_;
+    return empty;
+  }
   std::vector<size_t> mapping (size() - n);
   size_t i = n;
   std::generate(mapping.begin(), mapping.end(), [&] { return i++; });
-  return message {detail::decorated_tuple::make(vals_, mapping)};
+  auto result = message {detail::decorated_tuple::make(vals_, mapping)};
+  result.metadata_ = metadata_;
+  return result;
 }
 
 message message::drop_right(size_t n) const {
@@ -100,21 +109,29 @@ message message::drop_right(size_t n) const {
     return *this;
   }
   if (n >= size()) {
-    return message{};
+    auto empty = message{};
+    empty.metadata_ = metadata_;
+    return empty;
   }
   std::vector<size_t> mapping(size() - n);
   std::iota(mapping.begin(), mapping.end(), size_t{0});
-  return message{detail::decorated_tuple::make(vals_, std::move(mapping))};
+  auto result = message{detail::decorated_tuple::make(vals_, std::move(mapping))};
+  result.metadata_ = metadata_;
+  return result;
 }
 
 message message::slice(size_t pos, size_t n) const {
   auto s = size();
   if (pos >= s) {
-    return message{};
+    auto empty = message{};
+    empty.metadata_ = metadata_;
+    return empty;
   }
   std::vector<size_t> mapping(std::min(s - pos, n));
   std::iota(mapping.begin(), mapping.end(), pos);
-  return message{detail::decorated_tuple::make(vals_, std::move(mapping))};
+  auto result = message{detail::decorated_tuple::make(vals_, std::move(mapping))};
+  result.metadata_ = metadata_;
+  return result;
 }
 
 optional<message> message::apply(message_handler handler) {
@@ -137,6 +154,7 @@ message message::extract_impl(size_t start, message_handler handler) const {
           return message{};
         }
         message next{detail::decorated_tuple::make(vals_, std::move(mapping))};
+        next.metadata_ = metadata_;
         return next.extract_impl(i, handler);
       }
     }
@@ -396,14 +414,44 @@ message message::concat_impl(std::initializer_list<data_ptr> xs) {
   }
 }
 
+// TODO TEMP
+static std::string ToHex(const std::string& s)
+{
+  std::ostringstream ret;
+
+  for (std::string::size_type i = 0; i < s.length(); ++i)
+    ret << std::hex << std::setfill('0') << std::setw(2) << std::nouppercase << (int)s[i];
+
+  return ret.str();
+}
+
 error inspect(serializer& sink, message& msg) {
   if (sink.context() == nullptr)
     return sec::no_context;
   // build type name
   uint16_t zero = 0;
   std::string tname = "@<>";
+  auto save_metadata = [&]() -> error {
+      if (msg.metadata_.span && msg.metadata_.id > 0) {
+        sink(msg.metadata_.id);
+        std::cout << "   Serializing caf::message " << msg.metadata_ << " WITH span: " << msg.content().stringify() << std::endl;
+        auto& tracer = msg.metadata_.span->tracer();
+        auto& context = msg.metadata_.span->context();
+        std::ostringstream os;
+        tracer.Inject(context, os);
+        std::string encoded_span = os.str();
+        std::cout << "   Encoded span is: " << ToHex(encoded_span) << std::endl;
+        sink(encoded_span);
+      } else {
+        sink((uint64_t) 0);
+        std::cout << "   Serializing caf::message " << msg.metadata_ << " without span:" << std::endl;
+        std::cout << "       " << msg.content().stringify() << std::endl;
+      }
+      return none;
+  };
   if (msg.empty())
-    return error::eval([&] { return sink.begin_object(zero, tname); },
+    return error::eval([&] { return save_metadata(); },
+                       [&] { return sink.begin_object(zero, tname); },
                        [&] { return sink.end_object(); });
   auto& types = sink.context()->system().types();
   auto n = msg.size();
@@ -422,22 +470,6 @@ error inspect(serializer& sink, message& msg) {
     tname += *ptr;
   }
   auto save_loop = [&]() -> error {
-    if (msg.get_as<int>(1) == 42) {
-      std::cout << "   (this is the one!)" << std::endl;
-    }
-    if (msg.metadata_.span) {
-      std::cout << "   Serializing caf::message " << msg.metadata_ << " WITH span: " << msg.content().stringify() << std::endl;
-      sink(true);
-      auto& tracer = msg.metadata_.span->tracer();
-      auto& context = msg.metadata_.span->context();
-      std::ostringstream os;
-      tracer.Inject(context, os);
-      sink(os.str());
-    } else {
-      std::cout << "   Serializing caf::message " << msg.metadata_ << " without span:" << std::endl;
-      std::cout << "       " << msg.content().stringify() << std::endl;
-      sink(false);
-    }
     for (size_t i = 0; i < n; ++i) {
       auto e = msg.cvals()->save(i, sink);
       if (e)
@@ -445,17 +477,39 @@ error inspect(serializer& sink, message& msg) {
     }
     return none;
   };
-  return error::eval([&] { return sink.begin_object(zero, tname); },
-                     [&] { return save_loop();  },
+  return error::eval([&] { return save_metadata(); },
+                     [&] { return sink.begin_object(zero, tname); },
+                     [&] { return save_loop(); },
                      [&] { return sink.end_object(); });
 }
 
 error inspect(deserializer& source, message& msg) {
   if (source.context() == nullptr)
     return sec::no_context;
+  error err;
+
+  uint64_t metadata_id;
+  err = source(metadata_id);
+  if (err)
+    return err;
+  std::shared_ptr<opentracing::Span> span;
+  std::cout << "   Deserializing caf::message metadata " << metadata_id << std::endl;
+  if (metadata_id > 0) {
+    std::string encoded_span;
+    source(encoded_span);
+    std::cout << "   Encoded span is: " << ToHex(encoded_span) << std::endl;
+    std::istringstream encoded_span_stream{encoded_span};
+    auto tracer = opentracing::Tracer::Global();
+    auto context = tracer->Extract(encoded_span_stream);
+    if (context.has_value()) {
+      span = tracer->StartSpan("TODO operation name", {opentracing::ChildOf(context.value().get())});
+    } else {
+      std::cout << "   ERROR! could not extract context from the network data" << std::endl;
+    }
+  }
+
   uint16_t zero;
   std::string tname;
-  error err;
   err = source.begin_object(zero, tname);
   if (err)
     return err;
@@ -463,21 +517,11 @@ error inspect(deserializer& source, message& msg) {
     return sec::unknown_type;
   if (tname == "@<>") {
     msg = message{};
+    // TODO metadata for empty messages too
     return none;
   }
   if (tname.compare(0, 4, "@<>+") != 0)
     return sec::unknown_type;
-  // decode transmitted span
-  bool has_span;
-  source(has_span);
-  if (has_span) {
-    std::cout << "   Deserializing caf::message WITH span" << std::endl;
-    std::string encoded_span;
-    source(encoded_span);
-  } else {
-    std::cout << "   Deserializing caf::message without span" << std::endl;
-//    std::cout << "       " << msg.content().stringify() << std::endl;
-  }
   // iterate over concatenated type names
   auto eos = tname.end();
   auto next = [&](std::string::iterator iter) {
@@ -508,6 +552,9 @@ error inspect(deserializer& source, message& msg) {
     return err;
   message result{std::move(dmd)};
   msg.swap(result);
+  msg.metadata_.id = metadata_id;
+  msg.metadata_.span = std::move(span);
+  std::cout << "   Deserialized message is: " << msg.content().stringify() << " with " << msg.metadata_ << std::endl;
   return none;
 }
 

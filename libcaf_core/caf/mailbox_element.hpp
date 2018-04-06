@@ -124,6 +124,7 @@ public:
         metadata_(metadata) {
     // nop
     std::cout << "Building mailbox_element_vals with " << metadata << std::endl;
+    std::cout << "    " << content().stringify() << std::endl;
   }
 
   type_erased_tuple& content() override {

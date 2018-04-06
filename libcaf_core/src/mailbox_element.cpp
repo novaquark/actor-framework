@@ -31,7 +31,8 @@ public:
                           forwarding_stack&& x2, message&& x3)
       : mailbox_element(std::move(x0), x1, std::move(x2)),
         msg_(std::move(x3)) {
-    // nop
+    std::cout << "Building mailbox_element_wrapper with " << msg_.metadata_ << std::endl;
+    std::cout << "    " << content().stringify() << std::endl;
   }
 
   type_erased_tuple& content() override {
@@ -103,7 +104,8 @@ mailbox_element_ptr make_mailbox_element(strong_actor_ptr sender, message_id id,
                                          const message_metadata& metadata,
                                          mailbox_element::forwarding_stack stages,
                                          message msg) {
-  // TODO do something with metadata? can it be different from the one in msg?
+  // TODO do something else with metadata? can it be different from the one in msg?
+  msg.metadata_ = metadata;
   auto ptr = new mailbox_element_wrapper(std::move(sender), id,
                                          std::move(stages), std::move(msg));
   return mailbox_element_ptr{ptr};

@@ -61,7 +61,8 @@ void abstract_actor::on_destroy() {
 
 void abstract_actor::enqueue(strong_actor_ptr sender, message_id mid,
                              message msg, execution_unit* host) {
-  enqueue(make_mailbox_element(sender, mid, {}, {}, std::move(msg)), host);
+  auto metadata = msg.metadata_;
+  enqueue(make_mailbox_element(sender, mid, std::move(metadata), {}, std::move(msg)), host);
 }
 
 abstract_actor::abstract_actor(actor_config& cfg)
