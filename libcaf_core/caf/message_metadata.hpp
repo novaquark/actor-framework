@@ -30,7 +30,7 @@ namespace caf {
 
 /// Stores additional data that is transmitted along messages.
 struct message_metadata {
-  uint64_t                           id;
+  uint64_t                           id = 0;
   std::shared_ptr<opentracing::Span> span;
 
   void swap(message_metadata& other) {

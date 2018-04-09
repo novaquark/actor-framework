@@ -48,7 +48,7 @@ void forwarding_actor_proxy::forward_msg(strong_actor_ptr sender,
   forwarding_stack tmp;
   shared_lock<detail::shared_spinlock> guard(mtx_);
   if (broker_) {
-    std::cout << "Building forwarding message for " << msg.content().stringify() << " with metadata " << msg.metadata_ << std::endl;
+    std::cout << "Building forwarding message for " << to_string(msg) << " with metadata " << msg.metadata_ << std::endl;
     auto metadata = msg.metadata_;
     auto forwarding_msg = make_message(forward_atom::value, std::move(sender),
                                        fwd != nullptr ? *fwd : tmp,

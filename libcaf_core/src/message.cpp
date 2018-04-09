@@ -428,13 +428,10 @@ static std::string ToHex(const std::string& s)
 error inspect(serializer& sink, message& msg) {
   if (sink.context() == nullptr)
     return sec::no_context;
-  // build type name
-  uint16_t zero = 0;
-  std::string tname = "@<>";
   auto save_metadata = [&]() -> error {
       if (msg.metadata_.span && msg.metadata_.id > 0) {
         sink(msg.metadata_.id);
-        std::cout << "   Serializing caf::message " << msg.metadata_ << " WITH span: " << msg.content().stringify() << std::endl;
+        std::cout << "   Serializing caf::message " << msg.metadata_ << " WITH span: " << to_string(msg) << std::endl;
         auto& tracer = msg.metadata_.span->tracer();
         auto& context = msg.metadata_.span->context();
         std::ostringstream os;
@@ -445,10 +442,13 @@ error inspect(serializer& sink, message& msg) {
       } else {
         sink((uint64_t) 0);
         std::cout << "   Serializing caf::message " << msg.metadata_ << " without span:" << std::endl;
-        std::cout << "       " << msg.content().stringify() << std::endl;
+        std::cout << "       " << to_string(msg) << std::endl;
       }
       return none;
   };
+  // build type name
+  uint16_t zero = 0;
+  std::string tname = "@<>";
   if (msg.empty())
     return error::eval([&] { return save_metadata(); },
                        [&] { return sink.begin_object(zero, tname); },
@@ -502,7 +502,9 @@ error inspect(deserializer& source, message& msg) {
     auto tracer = opentracing::Tracer::Global();
     auto context = tracer->Extract(encoded_span_stream);
     if (context.has_value()) {
-      span = tracer->StartSpan("TODO operation name", {opentracing::ChildOf(context.value().get())});
+      auto span_name = std::string("TODO") + ":" + instrumentation::to_string(instrumentation::get_msgtype(msg));
+//      auto span_name = instrumentation::to_string(typeid(*dptr)) + ":" + instrumentation::to_string(instrumentation::get_msgtype(msg));
+      span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(context.value().get())});
     } else {
       std::cout << "   ERROR! could not extract context from the network data" << std::endl;
     }
@@ -517,7 +519,8 @@ error inspect(deserializer& source, message& msg) {
     return sec::unknown_type;
   if (tname == "@<>") {
     msg = message{};
-    // TODO metadata for empty messages too
+    msg.metadata_.id = metadata_id;
+    msg.metadata_.span = std::move(span);
     return none;
   }
   if (tname.compare(0, 4, "@<>+") != 0)
@@ -554,7 +557,7 @@ error inspect(deserializer& source, message& msg) {
   msg.swap(result);
   msg.metadata_.id = metadata_id;
   msg.metadata_.span = std::move(span);
-  std::cout << "   Deserialized message is: " << msg.content().stringify() << " with " << msg.metadata_ << std::endl;
+  std::cout << "   Deserialized message is: " << to_string(msg) << " with " << msg.metadata_ << std::endl;
   return none;
 }
 

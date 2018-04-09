@@ -36,7 +36,7 @@ namespace io {
 
 void abstract_broker::enqueue(strong_actor_ptr src, message_id mid,
                               message msg, execution_unit*) {
-  std::cout << "Enqueue message " << msg.content().stringify() << " to broker with " << msg.metadata_ << std::endl;
+  std::cout << "Enqueue message " << to_string(msg) << " to broker with " << msg.metadata_ << std::endl;
   auto metadata = msg.metadata_;
   enqueue(make_mailbox_element(std::move(src), mid, std::move(metadata), {}, std::move(msg)),
           &backend());

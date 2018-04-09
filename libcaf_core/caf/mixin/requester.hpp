@@ -105,7 +105,7 @@ public:
       message_metadata metadata = metadata_new();
       auto tracer = opentracing::Tracer::Global();
       auto span_name = instrumentation::to_string(typeid(*dptr)) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
-      if (span_name == "caf.event_based_actor:compute") {
+      if (span_name == "caf.event_based_actor:compute") { // TODO TEMP
           std::cout << "Requesting compute()" << std::endl;
       }
       if (dptr->current_metadata().span) {
