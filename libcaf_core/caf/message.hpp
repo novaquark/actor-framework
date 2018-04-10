@@ -40,10 +40,6 @@
 #include "caf/detail/message_data.hpp"
 #include "caf/detail/implicit_conversions.hpp"
 
-#ifdef CAF_ENABLE_INSTRUMENTATION
-#include <opentracing/tracer.h>
-#endif
-
 namespace caf {
 class message_handler;
 
@@ -337,7 +333,7 @@ private:
   data_ptr vals_;
 
 public:
-  message_metadata metadata_;
+  message_metadata metadata_; // TODO hide in private field?
 };
 
 /// @relates message

@@ -21,14 +21,13 @@
 #include <iostream>
 #include <utility>
 #include <utility>
-// TODO TEMP
-#include <iomanip>
 
 #include "caf/serializer.hpp"
 #include "caf/actor_system.hpp"
 #include "caf/deserializer.hpp"
 #include "caf/message_builder.hpp"
 #include "caf/message_handler.hpp"
+#include "caf/message_metadata.hpp"
 #include "caf/string_algorithms.hpp"
 
 #include "caf/detail/decorated_tuple.hpp"
@@ -414,37 +413,12 @@ message message::concat_impl(std::initializer_list<data_ptr> xs) {
   }
 }
 
-// TODO TEMP
-static std::string ToHex(const std::string& s)
-{
-  std::ostringstream ret;
-
-  for (std::string::size_type i = 0; i < s.length(); ++i)
-    ret << std::hex << std::setfill('0') << std::setw(2) << std::nouppercase << (int)s[i];
-
-  return ret.str();
-}
-
 error inspect(serializer& sink, message& msg) {
   if (sink.context() == nullptr)
     return sec::no_context;
   auto save_metadata = [&]() -> error {
-      if (msg.metadata_.span && msg.metadata_.id > 0) {
-        sink(msg.metadata_.id);
-        std::cout << "   Serializing caf::message " << msg.metadata_ << " WITH span: " << to_string(msg) << std::endl;
-        auto& tracer = msg.metadata_.span->tracer();
-        auto& context = msg.metadata_.span->context();
-        std::ostringstream os;
-        tracer.Inject(context, os);
-        std::string encoded_span = os.str();
-        std::cout << "   Encoded span is: " << ToHex(encoded_span) << std::endl;
-        sink(encoded_span);
-      } else {
-        sink((uint64_t) 0);
-        std::cout << "   Serializing caf::message " << msg.metadata_ << " without span:" << std::endl;
-        std::cout << "       " << to_string(msg) << std::endl;
-      }
-      return none;
+      std::cout << "Serializing caf::message " << to_string(msg) << " with metadata " << msg.metadata_ << std::endl;
+      return inspect(sink, msg.metadata_);
   };
   // build type name
   uint16_t zero = 0;
@@ -487,29 +461,10 @@ error inspect(deserializer& source, message& msg) {
   if (source.context() == nullptr)
     return sec::no_context;
   error err;
-
-  uint64_t metadata_id;
-  err = source(metadata_id);
+  message_metadata metadata;
+  err = inspect(source, metadata);
   if (err)
     return err;
-  std::shared_ptr<opentracing::Span> span;
-  std::cout << "   Deserializing caf::message metadata " << metadata_id << std::endl;
-  if (metadata_id > 0) {
-    std::string encoded_span;
-    source(encoded_span);
-    std::cout << "   Encoded span is: " << ToHex(encoded_span) << std::endl;
-    std::istringstream encoded_span_stream{encoded_span};
-    auto tracer = opentracing::Tracer::Global();
-    auto context = tracer->Extract(encoded_span_stream);
-    if (context.has_value()) {
-      auto span_name = std::string("TODO") + ":" + instrumentation::to_string(instrumentation::get_msgtype(msg));
-//      auto span_name = instrumentation::to_string(typeid(*dptr)) + ":" + instrumentation::to_string(instrumentation::get_msgtype(msg));
-      span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(context.value().get())});
-    } else {
-      std::cout << "   ERROR! could not extract context from the network data" << std::endl;
-    }
-  }
-
   uint16_t zero;
   std::string tname;
   err = source.begin_object(zero, tname);
@@ -519,8 +474,7 @@ error inspect(deserializer& source, message& msg) {
     return sec::unknown_type;
   if (tname == "@<>") {
     msg = message{};
-    msg.metadata_.id = metadata_id;
-    msg.metadata_.span = std::move(span);
+    msg.metadata_ = std::move(metadata);
     return none;
   }
   if (tname.compare(0, 4, "@<>+") != 0)
@@ -555,9 +509,8 @@ error inspect(deserializer& source, message& msg) {
     return err;
   message result{std::move(dmd)};
   msg.swap(result);
-  msg.metadata_.id = metadata_id;
-  msg.metadata_.span = std::move(span);
-  std::cout << "   Deserialized message is: " << to_string(msg) << " with " << msg.metadata_ << std::endl;
+  msg.metadata_ = std::move(metadata);
+  std::cout << "Deserialized message " << to_string(msg) << " with " << msg.metadata_ << std::endl;
   return none;
 }
 

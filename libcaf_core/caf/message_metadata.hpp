@@ -26,10 +26,14 @@
 
 #include <opentracing/tracer.h>
 
+#include "caf/serializer.hpp"
+#include "caf/deserializer.hpp"
+
 namespace caf {
 
 /// Stores additional data that is transmitted along messages.
-struct message_metadata {
+class message_metadata {
+public:
   uint64_t                           id = 0;
   std::shared_ptr<opentracing::Span> span;
 
@@ -40,18 +44,15 @@ struct message_metadata {
 };
 
 inline message_metadata metadata_new() {
-  static uint64_t next_id = 1;
+  static std::atomic<uint64_t> next_id{1};
   return message_metadata{next_id++, nullptr};
 }
 
-inline std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
-  s << "[metadata #" << std::to_string(p.id);
-  if (p.span) {
-    s << " with span " << p.span;
-  }
-  s << "]";
-  return s;
-}
+std::ostream& operator<<(std::ostream& s, const message_metadata& p);
+
+error inspect(serializer& sink, message_metadata& meta);
+
+error inspect(deserializer& source, message_metadata& meta);
 
 } // namespace caf
 

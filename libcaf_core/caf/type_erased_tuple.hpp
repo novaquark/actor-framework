@@ -27,7 +27,6 @@
 #include "caf/fwd.hpp"
 #include "caf/type_nr.hpp"
 #include "caf/optional.hpp"
-#include "caf/message_metadata.hpp"
 #include "caf/type_erased_value.hpp"
 
 #include "caf/detail/try_match.hpp"
@@ -105,10 +104,6 @@ public:
   /// Checks whether the type of the stored value at position `pos`
   /// matches type number `n` and run-time type information `p`.
   bool matches(size_t pos, uint16_t nr, const std::type_info* ptr) const  noexcept;
-
-  // -- metadata ---------------------------------------------------------------
-
-  message_metadata metadata_;
 
   // -- convenience functions --------------------------------------------------
 
