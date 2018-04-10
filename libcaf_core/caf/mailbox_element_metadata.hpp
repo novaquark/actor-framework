@@ -16,43 +16,31 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_MESSAGE_METADATA_HPP
-#define CAF_MESSAGE_METADATA_HPP
+#ifndef CAF_MAILBOX_ELEMENT_METADATA_HPP
+#define CAF_MAILBOX_ELEMENT_METADATA_HPP
 
-#include <memory>
-#include <atomic>
 #include <utility>
-#include <iostream>
 
 #include <opentracing/tracer.h>
 
-#include "caf/serializer.hpp"
-#include "caf/deserializer.hpp"
+#include "caf/message.hpp"
+
+#include "caf/instrumentation/instrumentation_ids.hpp"
 
 namespace caf {
 
-/// Stores additional data that is transmitted along messages.
-struct message_metadata {
-  uint64_t                                  id = 0;
-  std::shared_ptr<opentracing::SpanContext> span_ctx;
-
-  void swap(message_metadata& other) {
-    std::swap(id, other.id);
-    span_ctx.swap(other.span_ctx);
-  }
+struct mailbox_element_metadata {
+public:
+  std::unique_ptr<opentracing::Span> span;
 };
 
-inline message_metadata metadata_new(const mailbox_element_metadata& metadata_) {
-  static std::atomic<uint64_t> next_id{1};
-  return message_metadata{next_id++, nullptr};
+inline mailbox_element_metadata start_span_for(const message& msg) {
+  const auto tracer = opentracing::Tracer::Global();
+  const auto span_name = instrumentation::to_string(instrumentation::get_msgtype(msg));
+  auto span = tracer->StartSpan(span_name);
+  return mailbox_element_metadata{std::move(span)};
 }
-
-std::ostream& operator<<(std::ostream& s, const message_metadata& p);
-
-error inspect(serializer& sink, message_metadata& meta);
-
-error inspect(deserializer& source, message_metadata& meta);
 
 } // namespace caf
 
-#endif // CAF_MESSAGE_METADATA_HPP
+#endif // CAF_MAILBOX_ELEMENT_METADATA_HPP

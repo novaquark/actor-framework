@@ -37,22 +37,17 @@ static inline std::string ToHex(const std::string& s)
 }
 
 std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
-  s << "[metadata #" << std::to_string(p.id);
-  if (p.span) {
-    s << " with span " << p.span;
-  }
-  s << "]";
+  s << "[metadata #" << std::to_string(p.id) << "]";
   return s;
 }
 
 error inspect(serializer& sink, message_metadata& meta) {
   std::cout << "Serializing " << meta << std::endl;
-  if (meta.span && meta.id > 0) {
+  if (meta.span_ctx && meta.id > 0) {
     sink(meta.id);
-    const auto& tracer = meta.span->tracer();
-    auto& context = meta.span->context();
+    const auto tracer = opentracing::Tracer::Global();
     std::ostringstream os;
-    tracer.Inject(context, os);
+    tracer->Inject(meta.span_ctx.get(), os);
     std::string encoded_span = os.str();
     std::cout << "   Encoded span is: " << ToHex(encoded_span) << std::endl;
     sink(encoded_span);
@@ -73,12 +68,12 @@ error inspect(deserializer& source, message_metadata& meta) {
     source(encoded_span);
     std::cout << "   Encoded span is: " << ToHex(encoded_span) << std::endl;
     std::istringstream encoded_span_stream{encoded_span};
-    const auto& tracer = opentracing::Tracer::Global();
+    const auto tracer = opentracing::Tracer::Global();
     auto context = tracer->Extract(encoded_span_stream);
     if (context.has_value()) {
-      auto span = tracer->StartSpan("TODO:deserialized_message_metadata", {opentracing::ChildOf(context.value().get())});
+//      auto span = tracer->StartSpan("TODO:deserialized_message_metadata", {opentracing::ChildOf(context.value().get())});
       meta.id = metadata_id;
-      meta.span = std::move(span);
+      meta.span_ctx = std::move(context.value());
     } else {
       std::cout << "   ERROR! could not extract context from the network data" << std::endl;
       return sec::unknown_type; // TODO better error?

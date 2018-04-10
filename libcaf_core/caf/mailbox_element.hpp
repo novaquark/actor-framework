@@ -30,6 +30,7 @@
 #include "caf/memory_managed.hpp"
 #include "caf/type_erased_tuple.hpp"
 #include "caf/actor_control_block.hpp"
+#include "caf/mailbox_element_metadata.hpp"
 
 #include "caf/meta/type_name.hpp"
 #include "caf/meta/omittable_if_empty.hpp"
@@ -70,9 +71,8 @@ public:
   timestamp ts = make_timestamp();
 #endif
 
-  virtual message_metadata metadata() const {
+  virtual mailbox_element_metadata& metadata() const {
     assert(false);
-    return {};
   };
 
   mailbox_element();
@@ -116,15 +116,15 @@ class mailbox_element_vals
     : public mailbox_element,
       public detail::tuple_vals_impl<type_erased_tuple, Ts...> {
 public:
+  mailbox_element_metadata metadata_;
+
   template <class... Us>
-  mailbox_element_vals(strong_actor_ptr&& x0, message_id x1, const message_metadata& metadata,
+  mailbox_element_vals(strong_actor_ptr&& x0, message_id x1, mailbox_element_metadata metadata,
                        forwarding_stack&& x2, Us&&... xs)
       : mailbox_element(std::move(x0), x1, std::move(x2)),
         detail::tuple_vals_impl<type_erased_tuple, Ts...>(std::forward<Us>(xs)...),
-        metadata_(metadata) {
+        metadata_(std::move(metadata)) {
     // nop
-    std::cout << "Building mailbox_element_vals with " << metadata << std::endl;
-    std::cout << "    " << content().stringify() << std::endl;
   }
 
   type_erased_tuple& content() override {
@@ -135,7 +135,7 @@ public:
     message_factory f;
     auto& xs = this->data();
     auto msg = detail::apply_moved_args(f, detail::get_indices(xs), xs);
-    msg.metadata_ = this->metadata();
+    msg.metadata_ = msg;
     return msg;
   }
 
@@ -151,9 +151,7 @@ public:
     this->deref();
   }
 
-  message_metadata metadata_;
-  virtual message_metadata metadata() const override {
-    std::cout << "reading " << metadata_ << " from mailbox_element_vals" << std::endl;
+  mailbox_element_metadata& metadata() const override {
     return metadata_;
   }
 };
