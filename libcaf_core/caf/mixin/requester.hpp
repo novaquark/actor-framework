@@ -116,6 +116,7 @@ public:
         std::cout << "Starting " << metadata << " with span (" << span_name << ") root for " << dptr->current_metadata() << std::endl;
         metadata.span = tracer->StartSpan(std::move(span_name));
       }
+      metadata.state = metadata_state::Initialized;
       //metadata.span->Log({std::make_pair(opentracing::string_view("TEST:log"), opentracing::Value("TEST:log_value"))});
       //metadata.span->SetBaggageItem("op", instrumentation::to_string(instrumentation::get_msgtype(xs...)));
       instrument_helper<is_blocking_requester<Subtype>::value>

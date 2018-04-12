@@ -31,21 +31,30 @@
 
 namespace caf {
 
-/// Stores additional data that is transmitted along messages.
+enum class metadata_state {
+  Unknown,
+  Deserialized,
+  Initialized,
+};
+
+    /// Stores additional data that is transmitted along messages.
 class message_metadata {
 public:
+
   uint64_t                           id = 0;
   std::shared_ptr<opentracing::Span> span;
+  metadata_state                     state = metadata_state::Unknown; // not serialized
 
   void swap(message_metadata& other) {
     std::swap(id, other.id);
     span.swap(other.span);
+    std::swap(state, other.state);
   }
 };
 
 inline message_metadata metadata_new() {
   static std::atomic<uint64_t> next_id{1};
-  return message_metadata{next_id++, nullptr};
+  return message_metadata{next_id++, nullptr, metadata_state::Unknown};
 }
 
 std::ostream& operator<<(std::ostream& s, const message_metadata& p);

@@ -17,7 +17,8 @@
  ******************************************************************************/
 
 #include <caf/scheduled_actor.hpp>
-#include "caf/scheduled_actor.hpp"
+
+#include <utility>
 
 #include "caf/config.hpp"
 #include "caf/to_string.hpp"
@@ -403,7 +404,7 @@ scheduled_actor::categorize(mailbox_element& x) {
 invoke_message_result scheduled_actor::consume(mailbox_element& x) {
   CAF_LOG_TRACE(CAF_ARG(x));
   current_element_ = &x;
-  std::cout << "Consume mailbox element with metadata " << x.metadata() << std::endl;
+//  std::cout << "Consume mailbox element with metadata " << x.metadata() << std::endl;
   CAF_LOG_RECEIVE_EVENT(current_element_);
   // Helper function for dispatching a message to a response handler.
   using ptr_t = scheduled_actor*;
@@ -434,6 +435,22 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     awaited_responses_.pop_front();
 # ifdef CAF_ENABLE_INSTRUMENTATION
     record_response(x.mid);
+
+    // TODO this is duplicated code with "ordinary" pre-behavior
+    auto& current_span = current_element_->metadata().span;
+    auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
+    if (current_span) {
+      std::cout << "pre_behavior (awaited_reponse): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
+      if (current_element_->metadata().state == metadata_state::Deserialized) {
+        auto msgtype = instrumentation::get_msgtype(current_element_->content());
+        auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
+        std::cout << "   ...and renaming it " << span_name << std::endl;
+        current_span->SetOperationName(span_name);
+      }
+      current_span->Log({{"pre_behavior", opentracing::Value("awaited_response")}});
+    } else {
+      std::cout << "pre_behavior (awaited_reponse): Skipping log to " << temp_op << " because there is no current span" << std::endl;
+    }
 # endif
     if (!invoke(this, f, x)) {
       // try again with error if first attempt failed
@@ -452,6 +469,22 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       return im_dropped;
 # ifdef CAF_ENABLE_INSTRUMENTATION
     record_response(x.mid);
+
+    // TODO this is duplicated code with "ordinary" pre-behavior
+    auto& current_span = current_element_->metadata().span;
+    auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
+    if (current_span) {
+      std::cout << "pre_behavior (response): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
+      if (current_element_->metadata().state == metadata_state::Deserialized) {
+        auto msgtype = instrumentation::get_msgtype(current_element_->content());
+        auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
+        std::cout << "   ...and renaming it " << span_name << std::endl;
+        current_span->SetOperationName(span_name);
+      }
+      current_span->Log({{"pre_behavior", opentracing::Value("response")}});
+    } else {
+      std::cout << "pre_behavior (response): Skipping log to " << temp_op << " because there is no current span" << std::endl;
+    }
 # endif
     if (!invoke(this, mrh->second, x)) {
       // try again with error if first attempt failed
@@ -511,6 +544,19 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       auto msgtype = instrumentation::get_msgtype(current_element_->content());
       auto mb_wait_time = caf::timestamp_ago_ns(current_element_->ts);
       auto mb_size = mailbox_.cached_count(); // WARNING: using count() here can lock the actor when receiving network messages
+      auto& current_span = current_element_->metadata().span;
+      auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
+      if (current_span) {
+        std::cout << "pre_behavior (ordinary): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
+        if (current_element_->metadata().state == metadata_state::Deserialized) {
+          auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
+          std::cout << "   ...and renaming it " << span_name << std::endl;
+          current_span->SetOperationName(span_name);
+        }
+        current_span->Log({{"pre_behavior", opentracing::Value("ordinary")}});
+      } else {
+        std::cout << "pre_behavior (ordinary): Skipping log to " << temp_op << " because there is no current span" << std::endl;
+      }
 #endif
       switch (bhvr(visitor, x.content())) {
         default:

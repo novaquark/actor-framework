@@ -37,12 +37,7 @@ static inline std::string ToHex(const std::string& s)
 }
 
 std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
-  s << "[metadata #" << std::to_string(p.id);
-  if (p.span) {
-    s << " with span " << p.span;
-  }
-  s << "]";
-  return s;
+  return s << "[metadata #" << std::to_string(p.id) << " state=" << std::to_string((int)p.state) << "]";
 }
 
 error inspect(serializer& sink, message_metadata& meta) {
@@ -76,9 +71,10 @@ error inspect(deserializer& source, message_metadata& meta) {
     const auto& tracer = opentracing::Tracer::Global();
     auto context = tracer->Extract(encoded_span_stream);
     if (context.has_value()) {
-      auto span = tracer->StartSpan("TODO:deserialized_message_metadata", {opentracing::ChildOf(context.value().get())});
+      auto span = tracer->StartSpan("", {opentracing::ChildOf(context.value().get())});
       meta.id = metadata_id;
       meta.span = std::move(span);
+      meta.state = metadata_state::Deserialized;
     } else {
       std::cout << "   ERROR! could not extract context from the network data" << std::endl;
       return sec::unknown_type; // TODO better error?

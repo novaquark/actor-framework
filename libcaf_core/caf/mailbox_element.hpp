@@ -70,10 +70,9 @@ public:
   timestamp ts = make_timestamp();
 #endif
 
-  virtual message_metadata metadata() const {
-    assert(false);
-    return {};
-  };
+  virtual message_metadata& metadata() { assert(false); };
+
+  virtual const message_metadata& metadata() const { assert(false); };
 
   mailbox_element();
 
@@ -152,8 +151,14 @@ public:
   }
 
   message_metadata metadata_;
-  virtual message_metadata metadata() const override {
-    std::cout << "reading " << metadata_ << " from mailbox_element_vals" << std::endl;
+
+  message_metadata& metadata() override {
+//    std::cout << "(Reading " << metadata_ << " from mailbox_element_vals)" << std::endl;
+    return metadata_;
+  }
+
+  const message_metadata& metadata() const override {
+//    std::cout << "(Reading const " << metadata_ << " from mailbox_element_vals)" << std::endl;
     return metadata_;
   }
 };

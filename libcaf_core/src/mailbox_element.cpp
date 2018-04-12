@@ -50,8 +50,13 @@ public:
     return msg_;
   }
 
-  virtual message_metadata metadata() const override {
-    std::cout << "reading " << msg_.metadata_ << " from mailbox_element_wrapper" << std::endl;
+  message_metadata& metadata() override {
+//    std::cout << "(Reading " << msg_.metadata_ << " from mailbox_element_wrapper)" << std::endl;
+    return msg_.metadata_;
+  }
+
+  const message_metadata& metadata() const override {
+//    std::cout << "(Reading const " << msg_.metadata_ << " from mailbox_element_wrapper)" << std::endl;
     return msg_.metadata_;
   }
 
