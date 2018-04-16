@@ -437,17 +437,17 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     record_response(x.mid);
 
     // TODO this is duplicated code with "ordinary" pre-behavior
-    auto& current_span = current_element_->metadata().span;
+    auto& metadata = current_element_->metadata();
     auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
-    if (current_span) {
+    if (metadata) {
       std::cout << "pre_behavior (awaited_reponse): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
       if (current_element_->metadata().state == metadata_state::Deserialized) {
         auto msgtype = instrumentation::get_msgtype(current_element_->content());
         auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
         std::cout << "   ...and renaming it " << span_name << std::endl;
-        current_span->SetOperationName(span_name);
+        metadata.span->SetOperationName(span_name);
       }
-      current_span->Log({{"pre_behavior", opentracing::Value("awaited_response")}});
+      metadata.span->Log({{"pre_behavior", opentracing::Value("awaited_response")}});
     } else {
       std::cout << "pre_behavior (awaited_reponse): Skipping log to " << temp_op << " because there is no current span" << std::endl;
     }
@@ -458,6 +458,13 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
                                          x.move_content_to_message()));
       f(msg);
     }
+
+    // TODO this is duplicated code with "ordinary" post-behavior
+    if (metadata) {
+      metadata.span->Log({{"post_behavior", opentracing::Value("awaited_response")}});
+      metadata.span->Finish();
+    }
+
     return im_success;
   }
   // Handle multiplexed responses.
@@ -471,17 +478,17 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     record_response(x.mid);
 
     // TODO this is duplicated code with "ordinary" pre-behavior
-    auto& current_span = current_element_->metadata().span;
+    auto& metadata = current_element_->metadata();
     auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
-    if (current_span) {
+    if (metadata) {
       std::cout << "pre_behavior (response): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
       if (current_element_->metadata().state == metadata_state::Deserialized) {
         auto msgtype = instrumentation::get_msgtype(current_element_->content());
         auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
         std::cout << "   ...and renaming it " << span_name << std::endl;
-        current_span->SetOperationName(span_name);
+        metadata.span->SetOperationName(span_name);
       }
-      current_span->Log({{"pre_behavior", opentracing::Value("response")}});
+      metadata.span->Log({{"pre_behavior", opentracing::Value("response")}});
     } else {
       std::cout << "pre_behavior (response): Skipping log to " << temp_op << " because there is no current span" << std::endl;
     }
@@ -493,6 +500,13 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       mrh->second(msg);
     }
     multiplexed_responses_.erase(mrh);
+
+    // TODO this is duplicated code with "ordinary" post-behavior
+    if (metadata) {
+      metadata.span->Log({{"post_behavior", opentracing::Value("response")}});
+      metadata.span->Finish();
+    }
+
     return im_success;
   }
   // Dispatch on the content of x.
@@ -544,16 +558,16 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       auto msgtype = instrumentation::get_msgtype(current_element_->content());
       auto mb_wait_time = caf::timestamp_ago_ns(current_element_->ts);
       auto mb_size = mailbox_.cached_count(); // WARNING: using count() here can lock the actor when receiving network messages
-      auto& current_span = current_element_->metadata().span;
+      auto& metadata = current_element_->metadata();
       auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
-      if (current_span) {
+      if (metadata) {
         std::cout << "pre_behavior (ordinary): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
-        if (current_element_->metadata().state == metadata_state::Deserialized) {
+        if (metadata.state == metadata_state::Deserialized) {
           auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
           std::cout << "   ...and renaming it " << span_name << std::endl;
-          current_span->SetOperationName(span_name);
+          metadata.span->SetOperationName(span_name);
         }
-        current_span->Log({{"pre_behavior", opentracing::Value("ordinary")}});
+        metadata.span->Log({{"pre_behavior", opentracing::Value("ordinary")}});
       } else {
         std::cout << "pre_behavior (ordinary): Skipping log to " << temp_op << " because there is no current span" << std::endl;
       }
@@ -569,6 +583,11 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
             } else {
               context_->stats().record_behavior_aggregate(typeid(*this), msgtype, mb_wait_time, mb_size);
             }
+          }
+
+          if (metadata) {
+            metadata.span->Log({{"post_behavior", opentracing::Value("ordinary")}});
+            metadata.span->Finish();
           }
 #endif
           break;

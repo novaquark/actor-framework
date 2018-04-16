@@ -104,12 +104,11 @@ public:
 #ifdef CAF_ENABLE_INSTRUMENTATION
       message_metadata metadata = metadata_new();
       auto tracer = opentracing::Tracer::Global();
-//      auto span_name = instrumentation::to_string(typeid(*dptr)) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
       auto span_name = std::string(dptr->name()) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
       if (span_name == "AClient:compute") { // TODO TEMP
           std::cout << "Requesting compute()" << std::endl;
       }
-      if (dptr->current_metadata().span) {
+      if (dptr->current_metadata()) {
         std::cout << "Starting " << metadata << " with span (" << span_name << ") child of " << dptr->current_metadata() << std::endl;
         metadata.span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(&dptr->current_metadata().span->context())});
       } else {

@@ -45,6 +45,10 @@ public:
   std::shared_ptr<opentracing::Span> span;
   metadata_state                     state = metadata_state::Unknown; // not serialized
 
+  inline operator bool() const {
+      return static_cast<bool>(span);
+  }
+
   void swap(message_metadata& other) {
     std::swap(id, other.id);
     span.swap(other.span);

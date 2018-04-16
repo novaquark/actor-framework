@@ -456,9 +456,25 @@ public:
 #endif // CAF_ENABLE_INSTRUMENTATION
 
   message_metadata current_metadata() const {
-    if (current_element_ == nullptr)
-      return {};
-    return current_element_->metadata();
+    if (manually_started_trace_)
+      return *manually_started_trace_;
+    if (current_element_ != nullptr)
+      return current_element_->metadata();
+    return {};
+  }
+
+  void start_trace(std::string trace_name) {
+    auto tracer = opentracing::Tracer::Global();
+    const auto& current = current_metadata();
+    manually_started_trace_ = metadata_new();
+    if (current) {
+      std::cout << "!! start_trace " << trace_name << " child of " << current << std::endl;
+      manually_started_trace_->span = tracer->StartSpan(std::move(trace_name), {opentracing::ChildOf(&current.span->context())});
+    } else {
+      std::cout << "!! start_trace " << trace_name << " root with current metadata " << current << std::endl;
+      manually_started_trace_->span = tracer->StartSpan(std::move(trace_name));
+    }
+    manually_started_trace_->state = metadata_state::Initialized;
   }
 
 protected:
@@ -472,6 +488,9 @@ protected:
 
   // pointer to the sender of the currently processed message
   mailbox_element* current_element_ = nullptr;
+
+  // we can start a named trace by setting this with start_trace()
+  optional<message_metadata> manually_started_trace_;
 
   // last used request ID
   message_id last_request_id_;
