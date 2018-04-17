@@ -463,18 +463,10 @@ public:
     return {};
   }
 
-  void start_trace(std::string trace_name) {
-    auto tracer = opentracing::Tracer::Global();
+  void start_trace(const std::string& trace_name) {
     const auto& current = current_metadata();
-    manually_started_trace_ = metadata_new();
-    if (current) {
-      std::cout << "!! start_trace " << trace_name << " child of " << current << std::endl;
-      manually_started_trace_->span = tracer->StartSpan(std::move(trace_name), {opentracing::ChildOf(&current.span->context())});
-    } else {
-      std::cout << "!! start_trace " << trace_name << " root with current metadata " << current << std::endl;
-      manually_started_trace_->span = tracer->StartSpan(std::move(trace_name));
-    }
-    manually_started_trace_->state = metadata_state::Initialized;
+    manually_started_trace_ = message_metadata::subspan(current, trace_name);
+    std::cout << "!! start_trace() while current=" << current << " => " << manually_started_trace_.value() << std::endl;
   }
 
 protected:

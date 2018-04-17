@@ -35,18 +35,40 @@ enum class metadata_state {
   Unknown,
   Deserialized,
   Initialized,
+  Finished
 };
 
     /// Stores additional data that is transmitted along messages.
 class message_metadata {
 public:
 
-  uint64_t                           id = 0;
+  static message_metadata root(const std::string& span_name);
+
+  static message_metadata subspan(const message_metadata& parent, const std::string& span_name);
+
+  uint64_t                           id = 0;                          // for debug purposes
   std::shared_ptr<opentracing::Span> span;
   metadata_state                     state = metadata_state::Unknown; // not serialized
+  std::shared_ptr<std::string>       name;                            // not serialized, for debug purposes
 
   inline operator bool() const {
       return static_cast<bool>(span);
+  }
+
+  // TODO move to cpp
+  void finish() {
+    if (span && (state == metadata_state::Deserialized || state == metadata_state::Initialized)) {
+      span->Finish();
+      state = metadata_state::Finished;
+    }
+  }
+
+  // TODO move to cpp
+  template <typename T>
+  void log(std::string&& key, T&& value) {
+    if (span) {
+      span->Log({{std::move(key), opentracing::Value(std::forward<T>(value))}});
+    }
   }
 
   void swap(message_metadata& other) {
@@ -55,11 +77,6 @@ public:
     std::swap(state, other.state);
   }
 };
-
-inline message_metadata metadata_new() {
-  static std::atomic<uint64_t> next_id{1};
-  return message_metadata{next_id++, nullptr, metadata_state::Unknown};
-}
 
 std::ostream& operator<<(std::ostream& s, const message_metadata& p);
 

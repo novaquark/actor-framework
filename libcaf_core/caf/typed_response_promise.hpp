@@ -79,6 +79,11 @@ public:
     return *this;
   }
 
+  // TODO TEMP
+  void set_trace_name(std::string trace_name) {
+    promise_.set_trace_name(trace_name);
+  }
+
   /// Queries whether this promise is a valid promise that is not satisfied yet.
   inline bool pending() const {
     return promise_.pending();

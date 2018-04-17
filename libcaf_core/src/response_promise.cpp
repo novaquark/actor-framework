@@ -43,6 +43,8 @@ response_promise::response_promise(strong_actor_ptr self, mailbox_element& src)
     source_ = std::move(src.sender);
     stages_ = std::move(src.stages);
   }
+  metadata_ = message_metadata::subspan(src.metadata(), "response_promise");
+  metadata_.log("make_response_promise", "");
 }
 
 response_promise response_promise::deliver(error x) {
@@ -66,7 +68,7 @@ response_promise response_promise::deliver_impl(message msg) {
   if (!stages_.empty()) {
     auto next = std::move(stages_.back());
     stages_.pop_back();
-    next->enqueue(make_mailbox_element(std::move(source_), id_, {},
+    next->enqueue(make_mailbox_element(std::move(source_), id_, metadata_,
                                        std::move(stages_), std::move(msg)),
                   context());
     return *this;
@@ -75,6 +77,8 @@ response_promise response_promise::deliver_impl(message msg) {
     source_->enqueue(std::move(self_), id_.response_id(),
                      std::move(msg), context());
     source_.reset();
+    metadata_.log("deliver", instrumentation::to_string(instrumentation::get_msgtype(msg)));
+    metadata_.finish();
     return *this;
   }
   if (self_)

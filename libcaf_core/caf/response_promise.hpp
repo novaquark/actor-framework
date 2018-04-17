@@ -84,6 +84,7 @@ public:
     if (dest) {
       auto mid = P == message_priority::high ? id_.with_high_priority() : id_;
       dest->enqueue(make_mailbox_element(std::move(source_), mid,
+                                         metadata_,
                                          std::move(stages_),
                                          std::forward<Ts>(xs)...),
                     context());
@@ -94,6 +95,11 @@ public:
   /// Satisfies the promise by sending an error response message.
   /// For non-requests, nothing is done.
   response_promise deliver(error x);
+
+  // TODO TEMP
+  void set_trace_name(const std::string& trace_name) {
+    metadata_ = message_metadata::root(trace_name);
+  }
 
   /// Returns whether this response promise replies to an asynchronous message.
   bool async() const;
@@ -125,6 +131,7 @@ private:
 
   strong_actor_ptr self_;
   strong_actor_ptr source_;
+  message_metadata metadata_;
   forwarding_stack stages_;
   message_id id_;
 };

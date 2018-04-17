@@ -447,7 +447,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         std::cout << "   ...and renaming it " << span_name << std::endl;
         metadata.span->SetOperationName(span_name);
       }
-      metadata.span->Log({{"pre_behavior", opentracing::Value("awaited_response")}});
+      metadata.log("pre_behavior", "awaited_response");
     } else {
       std::cout << "pre_behavior (awaited_reponse): Skipping log to " << temp_op << " because there is no current span" << std::endl;
     }
@@ -461,8 +461,8 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 
     // TODO this is duplicated code with "ordinary" post-behavior
     if (metadata) {
-      metadata.span->Log({{"post_behavior", opentracing::Value("awaited_response")}});
-      metadata.span->Finish();
+      metadata.log("post_behavior", "awaited_response");
+      metadata.finish();
     }
 
     return im_success;
@@ -488,7 +488,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         std::cout << "   ...and renaming it " << span_name << std::endl;
         metadata.span->SetOperationName(span_name);
       }
-      metadata.span->Log({{"pre_behavior", opentracing::Value("response")}});
+      metadata.log("pre_behavior", "response");
     } else {
       std::cout << "pre_behavior (response): Skipping log to " << temp_op << " because there is no current span" << std::endl;
     }
@@ -503,8 +503,8 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 
     // TODO this is duplicated code with "ordinary" post-behavior
     if (metadata) {
-      metadata.span->Log({{"post_behavior", opentracing::Value("response")}});
-      metadata.span->Finish();
+      metadata.log("post_behavior", "response");
+      metadata.finish();
     }
 
     return im_success;
@@ -567,7 +567,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
           std::cout << "   ...and renaming it " << span_name << std::endl;
           metadata.span->SetOperationName(span_name);
         }
-        metadata.span->Log({{"pre_behavior", opentracing::Value("ordinary")}});
+        metadata.log("pre_behavior", "ordinary");
       } else {
         std::cout << "pre_behavior (ordinary): Skipping log to " << temp_op << " because there is no current span" << std::endl;
       }
@@ -586,8 +586,8 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
           }
 
           if (metadata) {
-            metadata.span->Log({{"post_behavior", opentracing::Value("ordinary")}});
-            metadata.span->Finish();
+            metadata.log("post_behavior", "ordinary");
+            metadata.finish();
           }
 #endif
           break;

@@ -25,6 +25,39 @@
 
 namespace caf {
 
+static message_metadata metadata_gen() {
+  static std::atomic<uint64_t> next_id{1};
+  message_metadata result;
+  result.id = next_id++;
+  result.state = metadata_state::Unknown;
+  return result;
+}
+
+message_metadata message_metadata::root(const std::string& span_name) {
+  message_metadata result = metadata_gen();
+  result.name = std::make_shared<std::string>(span_name);
+  {
+    auto tracer = opentracing::Tracer::Global();
+    result.span = tracer->StartSpan(span_name);
+  }
+  result.state = metadata_state::Initialized;
+  return result;
+}
+
+message_metadata message_metadata::subspan(const message_metadata& parent, const std::string& span_name) {
+  message_metadata result = metadata_gen();
+  result.name = std::make_shared<std::string>(span_name);
+  if (parent) {
+    const auto& tracer = parent.span->tracer();
+    result.span = tracer.StartSpan(span_name, {opentracing::ChildOf(&parent.span->context())});
+  } else {
+    auto tracer = opentracing::Tracer::Global();
+    result.span = tracer->StartSpan(span_name);
+  }
+  result.state = metadata_state::Initialized;
+  return result;
+}
+
 // TODO TEMP
 static inline std::string ToHex(const std::string& s)
 {
@@ -37,7 +70,14 @@ static inline std::string ToHex(const std::string& s)
 }
 
 std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
-  return s << "[metadata #" << std::to_string(p.id) << " state=" << std::to_string((int)p.state) << "]";
+  s << "[metadata #" << std::to_string(p.id) << " state=";
+  switch (p.state) {
+    case metadata_state::Deserialized: s << "Deserialized"; break;
+    case metadata_state::Initialized:  s << "Initialized";  break;
+    case metadata_state::Finished:     s << "Finished";     break;
+    default:                           s << "Unknown";      break;
+  }
+  return s << "]";
 }
 
 error inspect(serializer& sink, message_metadata& meta) {

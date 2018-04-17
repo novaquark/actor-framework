@@ -102,22 +102,12 @@ public:
     auto req_id = dptr->new_request_id(P);
     if (dest) {
 #ifdef CAF_ENABLE_INSTRUMENTATION
-      message_metadata metadata = metadata_new();
       auto tracer = opentracing::Tracer::Global();
       auto span_name = std::string(dptr->name()) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
       if (span_name == "AClient:compute") { // TODO TEMP
           std::cout << "Requesting compute()" << std::endl;
       }
-      if (dptr->current_metadata()) {
-        std::cout << "Starting " << metadata << " with span (" << span_name << ") child of " << dptr->current_metadata() << std::endl;
-        metadata.span = tracer->StartSpan(std::move(span_name), {opentracing::ChildOf(&dptr->current_metadata().span->context())});
-      } else {
-        std::cout << "Starting " << metadata << " with span (" << span_name << ") root for " << dptr->current_metadata() << std::endl;
-        metadata.span = tracer->StartSpan(std::move(span_name));
-      }
-      metadata.state = metadata_state::Initialized;
-      //metadata.span->Log({std::make_pair(opentracing::string_view("TEST:log"), opentracing::Value("TEST:log_value"))});
-      //metadata.span->SetBaggageItem("op", instrumentation::to_string(instrumentation::get_msgtype(xs...)));
+      message_metadata metadata = message_metadata::subspan(dptr->current_metadata(), span_name);
       instrument_helper<is_blocking_requester<Subtype>::value>
                        ::register_request(dptr, req_id.response_id(), metadata.span, xs...);
 #endif
