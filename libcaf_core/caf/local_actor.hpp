@@ -456,17 +456,22 @@ public:
 #endif // CAF_ENABLE_INSTRUMENTATION
 
   message_metadata current_metadata() const {
-    if (manually_started_trace_)
-      return *manually_started_trace_;
     if (current_element_ != nullptr)
       return current_element_->metadata();
+    if (manually_started_trace_)
+      return *manually_started_trace_;
     return {};
   }
 
   void start_trace(const std::string& trace_name) {
-    const auto& current = current_metadata();
-    manually_started_trace_ = message_metadata::subspan(current, trace_name);
-    std::cout << "!! start_trace() while current=" << current << " => " << manually_started_trace_.value() << std::endl;
+    if (current_element_ == nullptr && !manually_started_trace_) {
+      manually_started_trace_ = message_metadata::root(trace_name);
+      std::cout << "!! start_trace() => " << manually_started_trace_.value()  << std::endl;
+    } else if (current_element_ != nullptr) {
+      std::cout << "ERROR!! cannot start_trace() since we already have a current_element"  << std::endl;
+    } else {
+      std::cout << "ERROR!! cannot start_trace() since we already have a manually_started_trace"  << std::endl;
+    }
   }
 
 protected:

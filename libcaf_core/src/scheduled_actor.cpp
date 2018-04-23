@@ -440,12 +440,12 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     auto& metadata = current_element_->metadata();
     auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
     if (metadata) {
-      std::cout << "pre_behavior (awaited_reponse): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
-      if (current_element_->metadata().state == metadata_state::Deserialized) {
+      std::cout << "pre_behavior (awaited_reponse): Adding log to " << temp_op << " " << metadata << std::endl;
+      if (metadata.state() == metadata_state::Deserialized) {
         auto msgtype = instrumentation::get_msgtype(current_element_->content());
         auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
         std::cout << "   ...and renaming it " << span_name << std::endl;
-        metadata.span->SetOperationName(span_name);
+        metadata.set_name(span_name);
       }
       metadata.log("pre_behavior", "awaited_response");
     } else {
@@ -482,11 +482,11 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
     if (metadata) {
       std::cout << "pre_behavior (response): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
-      if (current_element_->metadata().state == metadata_state::Deserialized) {
+      if (current_element_->metadata().state() == metadata_state::Deserialized) {
         auto msgtype = instrumentation::get_msgtype(current_element_->content());
         auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
         std::cout << "   ...and renaming it " << span_name << std::endl;
-        metadata.span->SetOperationName(span_name);
+        metadata.set_name(span_name);
       }
       metadata.log("pre_behavior", "response");
     } else {
@@ -562,10 +562,10 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       auto temp_op = to_string(current_element_->copy_content_to_message()); // TODO TEMP
       if (metadata) {
         std::cout << "pre_behavior (ordinary): Adding log to " << temp_op << " " << current_element_->metadata() << std::endl;
-        if (metadata.state == metadata_state::Deserialized) {
+        if (metadata.state() == metadata_state::Deserialized) {
           auto span_name = std::string(name()) + ":" + instrumentation::to_string(msgtype);
           std::cout << "   ...and renaming it " << span_name << std::endl;
-          metadata.span->SetOperationName(span_name);
+          metadata.set_name(span_name);
         }
         metadata.log("pre_behavior", "ordinary");
       } else {
@@ -809,8 +809,8 @@ void scheduled_actor::record_response(message_id mid) {
     if (it != requests_in_progress_.cend()) {
       auto req_wait_time = timestamp_ago_ns(it->second.ts);
       context()->stats().record_request_aggregate(typeid(*this), it->second.msgtype, req_wait_time);
-      it->second.span->SetTag("actor_id", id());
-      it->second.span->Finish();
+      it->second.metadata.tag("actor_id", id());
+      it->second.metadata.finish();
       requests_in_progress_.erase(it);
     }
   }

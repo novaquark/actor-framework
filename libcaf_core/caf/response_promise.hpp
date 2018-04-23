@@ -82,6 +82,7 @@ public:
     static_assert(response_type_unbox<signatures_of_t<Handle>, token>::valid,
                   "receiver does not accept given message");
     if (dest) {
+      metadata_.log("delegate", "");
       auto mid = P == message_priority::high ? id_.with_high_priority() : id_;
       dest->enqueue(make_mailbox_element(std::move(source_), mid,
                                          metadata_,
@@ -98,7 +99,7 @@ public:
 
   // TODO TEMP
   void set_trace_name(const std::string& trace_name) {
-    metadata_ = message_metadata::root(trace_name);
+    metadata_.set_name(trace_name);
   }
 
   /// Returns whether this response promise replies to an asynchronous message.

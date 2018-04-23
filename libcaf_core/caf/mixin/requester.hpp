@@ -43,7 +43,7 @@ struct is_blocking_requester : std::false_type { };
 template <bool isBlocking>
 struct instrument_helper {
     template <class Type, class... Ts>
-    static void register_request(Type*, message_id, const std::shared_ptr<opentracing::Span>&, const Ts&...) {
+    static void register_request(Type*, message_id, const message_metadata&, const Ts&...) {
       // nop
     }
 };
@@ -51,8 +51,8 @@ struct instrument_helper {
 template <>
 struct instrument_helper<false> {
  template <class Type, class... Ts>
- static void register_request(Type* actor, message_id id, const std::shared_ptr<opentracing::Span>& span, const Ts&... xs) {
-   actor->register_request(id, span, xs...);
+ static void register_request(Type* actor, message_id id, const message_metadata& metadata, const Ts&... xs) {
+   actor->register_request(id, metadata, xs...);
  }
 };
 
@@ -109,7 +109,7 @@ public:
       }
       message_metadata metadata = message_metadata::subspan(dptr->current_metadata(), span_name);
       instrument_helper<is_blocking_requester<Subtype>::value>
-                       ::register_request(dptr, req_id.response_id(), metadata.span, xs...);
+                       ::register_request(dptr, req_id.response_id(), metadata, xs...);
 #endif
       dest->eq_impl(req_id, std::move(metadata), dptr->ctrl(), dptr->context(),
                     std::forward<Ts>(xs)...);

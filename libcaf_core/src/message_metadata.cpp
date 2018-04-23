@@ -28,33 +28,31 @@ namespace caf {
 static message_metadata metadata_gen() {
   static std::atomic<uint64_t> next_id{1};
   message_metadata result;
-  result.id = next_id++;
-  result.state = metadata_state::Unknown;
+  result.id_ = next_id++;
+  result.state_ = metadata_state::Unknown;
   return result;
 }
 
 message_metadata message_metadata::root(const std::string& span_name) {
   message_metadata result = metadata_gen();
-  result.name = std::make_shared<std::string>(span_name);
-  {
-    auto tracer = opentracing::Tracer::Global();
-    result.span = tracer->StartSpan(span_name);
-  }
-  result.state = metadata_state::Initialized;
+  result.name_ = std::make_shared<std::string>(span_name);
+  auto tracer = opentracing::Tracer::Global();
+  result.span_ = tracer->StartSpan(span_name);
+  result.state_ = metadata_state::Initialized;
   return result;
 }
 
 message_metadata message_metadata::subspan(const message_metadata& parent, const std::string& span_name) {
   message_metadata result = metadata_gen();
-  result.name = std::make_shared<std::string>(span_name);
+  result.name_ = std::make_shared<std::string>(span_name);
   if (parent) {
-    const auto& tracer = parent.span->tracer();
-    result.span = tracer.StartSpan(span_name, {opentracing::ChildOf(&parent.span->context())});
+    const auto& tracer = parent.span_->tracer();
+    result.span_ = tracer.StartSpan(span_name, {opentracing::ChildOf(&parent.span_->context())});
   } else {
     auto tracer = opentracing::Tracer::Global();
-    result.span = tracer->StartSpan(span_name);
+    result.span_ = tracer->StartSpan(span_name);
   }
-  result.state = metadata_state::Initialized;
+  result.state_ = metadata_state::Initialized;
   return result;
 }
 
@@ -70,8 +68,11 @@ static inline std::string ToHex(const std::string& s)
 }
 
 std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
-  s << "[metadata #" << std::to_string(p.id) << " state=";
-  switch (p.state) {
+  s << "[metadata #" << std::to_string(p.id_) << " ";
+  if (p.name_) {
+    s << "\"" << *p.name_ << "\" ";
+  }
+  switch (p.state_) {
     case metadata_state::Deserialized: s << "Deserialized"; break;
     case metadata_state::Initialized:  s << "Initialized";  break;
     case metadata_state::Finished:     s << "Finished";     break;
@@ -82,10 +83,10 @@ std::ostream& operator<<(std::ostream& s, const message_metadata& p) {
 
 error inspect(serializer& sink, message_metadata& meta) {
   std::cout << "Serializing " << meta << std::endl;
-  if (meta.span && meta.id > 0) {
-    sink(meta.id);
-    const auto& tracer = meta.span->tracer();
-    auto& context = meta.span->context();
+  if (meta.span_ && meta.id_ > 0) {
+    sink(meta.id_);
+    const auto& tracer = meta.span_->tracer();
+    auto& context = meta.span_->context();
     std::ostringstream os;
     tracer.Inject(context, os);
     std::string encoded_span = os.str();
@@ -112,9 +113,9 @@ error inspect(deserializer& source, message_metadata& meta) {
     auto context = tracer->Extract(encoded_span_stream);
     if (context.has_value()) {
       auto span = tracer->StartSpan("", {opentracing::ChildOf(context.value().get())});
-      meta.id = metadata_id;
-      meta.span = std::move(span);
-      meta.state = metadata_state::Deserialized;
+      meta.id_ = metadata_id;
+      meta.span_ = std::move(span);
+      meta.state_ = metadata_state::Deserialized;
     } else {
       std::cout << "   ERROR! could not extract context from the network data" << std::endl;
       return sec::unknown_type; // TODO better error?

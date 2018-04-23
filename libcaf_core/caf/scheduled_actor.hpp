@@ -39,6 +39,7 @@
 #include "caf/scheduled_actor.hpp"
 #include "caf/random_gatherer.hpp"
 #include "caf/stream_sink_impl.hpp"
+#include "caf/message_metadata.hpp"
 #include "caf/stream_stage_impl.hpp"
 #include "caf/stream_source_impl.hpp"
 #include "caf/stream_result_trait.hpp"
@@ -57,7 +58,6 @@
 
 #ifdef CAF_ENABLE_INSTRUMENTATION
 #include <memory>
-#include <opentracing/tracer.h>
 #endif
 
 namespace caf {
@@ -807,12 +807,11 @@ public:
   }
 #ifdef CAF_ENABLE_INSTRUMENTATION
   template <class... Ts>
-  void register_request(message_id mid, const std::shared_ptr<opentracing::Span>& span, const Ts&... xs) {
+  void register_request(message_id mid, const message_metadata& metadata, const Ts&... xs) {
     if (context() != nullptr) {
       auto cid = instrumentation::get_msgtype(xs...);
-      auto tracer = opentracing::Tracer::Global();
-      std::cout << "register_request with span " << span << std::endl;
-      requests_in_progress_.emplace(mid, request_data{make_timestamp(), cid, span});
+      std::cout << "register_request with " << metadata << std::endl;
+      requests_in_progress_.emplace(mid, request_data{make_timestamp(), cid, metadata});
     }
   }
   void record_response(message_id mid);
@@ -894,9 +893,9 @@ protected:
 
 # ifdef CAF_ENABLE_INSTRUMENTATION
   struct request_data {
-    timestamp                          ts;
-    instrumentation::msgtype_id        msgtype;
-    std::shared_ptr<opentracing::Span> span;
+    timestamp                   ts;
+    instrumentation::msgtype_id msgtype;
+    message_metadata            metadata;
   };
   std::unordered_map<message_id, request_data> requests_in_progress_;
 # endif // CAF_ENABLE_INSTRUMENTATION

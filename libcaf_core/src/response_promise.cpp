@@ -24,6 +24,9 @@
 #include "caf/logger.hpp"
 #include "caf/local_actor.hpp"
 
+// TODO TEMP
+#include <atomic>
+
 namespace caf {
 
 response_promise::response_promise() : self_(nullptr) {
@@ -43,8 +46,11 @@ response_promise::response_promise(strong_actor_ptr self, mailbox_element& src)
     source_ = std::move(src.sender);
     stages_ = std::move(src.stages);
   }
-  metadata_ = message_metadata::subspan(src.metadata(), "response_promise");
-  metadata_.log("make_response_promise", "");
+  static std::atomic<int> i{1}; // TODO TEMP
+  metadata_ = message_metadata::subspan(src.metadata(), "(anonymous response promise)");
+  metadata_.log("make_response_promise", std::to_string(i));
+//  std::cout << "make_response_promise(" << i << "): " << metadata_ << std::endl;
+  i++;
 }
 
 response_promise response_promise::deliver(error x) {
@@ -74,10 +80,11 @@ response_promise response_promise::deliver_impl(message msg) {
     return *this;
   }
   if (source_) {
+    auto result_msgtype = instrumentation::to_string(instrumentation::get_msgtype(msg));
     source_->enqueue(std::move(self_), id_.response_id(),
                      std::move(msg), context());
     source_.reset();
-    metadata_.log("deliver", instrumentation::to_string(instrumentation::get_msgtype(msg)));
+    metadata_.log("deliver", result_msgtype);
     metadata_.finish();
     return *this;
   }
