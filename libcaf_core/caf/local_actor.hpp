@@ -398,7 +398,7 @@ public:
                             ? mid.with_high_priority()
                             : mid.with_normal_priority();
     dest->enqueue(make_mailbox_element(std::move(current_element_->sender),
-                                       mid, {}, std::move(current_element_->stages),
+                                       mid, current_element_->metadata(), std::move(current_element_->stages),
                                        std::forward<Ts>(xs)...),
                   context());
     return {};
@@ -472,6 +472,10 @@ public:
     } else {
       std::cout << "ERROR!! cannot start_trace() since we already have a manually_started_trace"  << std::endl;
     }
+  }
+
+  void log_trace(const char* file, int line, std::string&& value) {
+    current_metadata().log("log_trace", std::string(file) + ":" + std::to_string(line) + " " + std::move(value));
   }
 
 protected:

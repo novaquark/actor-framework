@@ -61,8 +61,9 @@ public:
                        detail::is_specialization<result, Ts>::value...
                      >::value,
                   "it is not possible to deliver objects of type result<...>");
-    return deliver_impl(make_message(std::forward<T>(x),
-                                     std::forward<Ts>(xs)...));
+    auto msg = make_message(std::forward<T>(x), std::forward<Ts>(xs)...);
+    msg.metadata_ = metadata_;
+    return deliver_impl(msg);
   }
 
   /// Satisfies the promise by delegating to another actor.
@@ -101,6 +102,8 @@ public:
   void set_trace_name(const std::string& trace_name) {
     metadata_.set_name(trace_name);
   }
+
+  const message_metadata& metadata() const { return metadata_; }
 
   /// Returns whether this response promise replies to an asynchronous message.
   bool async() const;

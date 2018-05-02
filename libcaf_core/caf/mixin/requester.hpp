@@ -103,10 +103,7 @@ public:
     if (dest) {
 #ifdef CAF_ENABLE_INSTRUMENTATION
       auto tracer = opentracing::Tracer::Global();
-      auto span_name = std::string(dptr->name()) + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
-      if (span_name == "AClient:compute") { // TODO TEMP
-          std::cout << "Requesting compute()" << std::endl;
-      }
+      auto span_name = std::string("request() ") + dptr->name() + ":" + instrumentation::to_string(instrumentation::get_msgtype(xs...));
       message_metadata metadata = message_metadata::subspan(dptr->current_metadata(), span_name);
       instrument_helper<is_blocking_requester<Subtype>::value>
                        ::register_request(dptr, req_id.response_id(), metadata, xs...);

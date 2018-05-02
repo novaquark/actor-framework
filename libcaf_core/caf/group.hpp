@@ -112,7 +112,7 @@ public:
   void eq_impl(message_id mid, const message_metadata& metadata, strong_actor_ptr sender,
                execution_unit* ctx, Ts&&... xs) const {
     CAF_ASSERT(!mid.is_request());
-    // TODO jhandle metadata
+    // TODO handle metadata
     if (ptr_)
       ptr_->enqueue(std::move(sender), mid,
                     make_message(std::forward<Ts>(xs)...), ctx);

@@ -80,8 +80,12 @@ public:
   }
 
   // TODO TEMP
-  void set_trace_name(std::string trace_name) {
+  void set_trace_name(const std::string& trace_name) {
     promise_.set_trace_name(trace_name);
+  }
+
+  const message_metadata& metadata() const {
+    return promise_.metadata();
   }
 
   /// Queries whether this promise is a valid promise that is not satisfied yet.

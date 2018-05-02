@@ -150,7 +150,7 @@ public:
     if (dest) {
       auto& clock = dptr()->system().clock();
       auto t = clock.now() + rtime;
-      auto me = make_mailbox_element(dptr()->ctrl(), make_message_id(P), {},
+      auto me = make_mailbox_element(dptr()->ctrl(), make_message_id(P), {}, // TODO metadata
                                      no_stages, std::forward<Ts>(xs)...);
       clock.schedule_message(t, actor_cast<strong_actor_ptr>(dest),
                              std::move(me));
@@ -176,7 +176,7 @@ public:
     if (dest) {
       auto& clock = dptr()->system().clock();
       auto t = clock.now() + rtime;
-      auto me = make_mailbox_element(nullptr, make_message_id(P), no_stages,
+      auto me = make_mailbox_element(nullptr, make_message_id(P), no_stages, // TODO metadata
                                      std::forward<Ts>(xs)...);
       clock.schedule_message(t, actor_cast<strong_actor_ptr>(dest),
                              std::move(me));

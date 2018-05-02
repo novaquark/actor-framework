@@ -447,7 +447,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         std::cout << "   ...and renaming it " << span_name << std::endl;
         metadata.set_name(span_name);
       }
-      metadata.log("pre_behavior", "awaited_response");
+      metadata.log("consume::pre_behavior", "awaited_response");
     } else {
       std::cout << "pre_behavior (awaited_reponse): Skipping log to " << temp_op << " because there is no current span" << std::endl;
     }
@@ -461,7 +461,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 
     // TODO this is duplicated code with "ordinary" post-behavior
     if (metadata) {
-      metadata.log("post_behavior", "awaited_response");
+      metadata.log("consume::post_behavior", "awaited_response");
       metadata.finish();
     }
 
@@ -488,7 +488,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         std::cout << "   ...and renaming it " << span_name << std::endl;
         metadata.set_name(span_name);
       }
-      metadata.log("pre_behavior", "response");
+      metadata.log("consume::pre_behavior", "response");
     } else {
       std::cout << "pre_behavior (response): Skipping log to " << temp_op << " because there is no current span" << std::endl;
     }
@@ -503,7 +503,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 
     // TODO this is duplicated code with "ordinary" post-behavior
     if (metadata) {
-      metadata.log("post_behavior", "response");
+      metadata.log("consume::post_behavior", "response");
       metadata.finish();
     }
 
@@ -567,7 +567,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
           std::cout << "   ...and renaming it " << span_name << std::endl;
           metadata.set_name(span_name);
         }
-        metadata.log("pre_behavior", "ordinary");
+        metadata.log("consume::pre_behavior", "ordinary");
       } else {
         std::cout << "pre_behavior (ordinary): Skipping log to " << temp_op << " because there is no current span" << std::endl;
       }
@@ -586,7 +586,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
           }
 
           if (metadata) {
-            metadata.log("post_behavior", "ordinary");
+            metadata.log("consume::post_behavior", "ordinary");
             metadata.finish();
           }
 #endif

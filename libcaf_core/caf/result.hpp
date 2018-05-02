@@ -26,6 +26,7 @@
 #include "caf/expected.hpp"
 #include "caf/message.hpp"
 #include "caf/delegated.hpp"
+#include "caf/response_promise.hpp"
 
 #include "caf/detail/type_list.hpp"
 
@@ -87,12 +88,12 @@ namespace caf {
           // nop
         }
 
-        result(const typed_response_promise<Ts...>&) : flag(rt_delegated) {
-          // nop
+        result(const typed_response_promise<Ts...>& rp) : flag(rt_delegated) {
+          value.metadata_ = rp.metadata();
         }
 
-        result(const response_promise&) : flag(rt_delegated) {
-          // nop
+        result(const response_promise& rp) : flag(rt_delegated) {
+          value.metadata_ = rp.metadata();
         }
 
         result_runtime_type flag;

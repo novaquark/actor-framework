@@ -79,13 +79,14 @@ response_promise response_promise::deliver_impl(message msg) {
                   context());
     return *this;
   }
+  // TODO if state < Finished
+  auto result_msgtype = instrumentation::to_string(instrumentation::get_msgtype(msg));
+  metadata_.log("deliver", result_msgtype);
+  metadata_.finish();
   if (source_) {
-    auto result_msgtype = instrumentation::to_string(instrumentation::get_msgtype(msg));
     source_->enqueue(std::move(self_), id_.response_id(),
                      std::move(msg), context());
     source_.reset();
-    metadata_.log("deliver", result_msgtype);
-    metadata_.finish();
     return *this;
   }
   if (self_)
