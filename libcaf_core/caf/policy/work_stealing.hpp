@@ -98,7 +98,7 @@ public:
     if (victim == self->id())
       victim = p->num_workers() - 1;
     // steal oldest element from the victim's queue
-    return d(p->worker_by_id(victim)).queue.take_tail();
+    return d(p->worker_by_id(victim)).queue.take_head();
   }
 
   template <class Coordinator>
