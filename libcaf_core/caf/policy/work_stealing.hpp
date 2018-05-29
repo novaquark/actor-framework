@@ -122,7 +122,7 @@ public:
 
   template <class Worker>
   void internal_enqueue(Worker* self, resumable* job) {
-    d(self).queue.prepend(job);
+    d(self).queue.append(job);
   }
 
   template <class Worker>
