@@ -574,6 +574,31 @@ behavior basp_broker::make_behavior() {
         srb(src, mid);
       }
     },
+    // received from proxy instances
+    [=](forward_atom, strong_actor_ptr& src, strong_actor_ptr& dest,
+        message_id mid, const message& msg, std::vector<char>& serialized_msg) {
+      CAF_LOG_TRACE(CAF_ARG(src) << CAF_ARG(dest)
+                    << CAF_ARG(mid) << CAF_ARG(msg));
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      auto msgtype = instrumentation::get_msgtype(msg);
+      auto mb_wait_time = timestamp_ago_ns(this->current_message_ts());
+      auto mb_size = this->mailbox_cached_count();
+      state.stats.record_broker_forward(msgtype, mb_wait_time, mb_size);
+#endif
+      if (!dest || system().node() == dest->node()) {
+        CAF_LOG_WARNING("cannot forward to invalid or local actor:"
+                        << CAF_ARG(dest));
+        return;
+      }
+      if (src && system().node() == src->node())
+        system().registry().put(src->id(), src);
+      if (!state.instance.dispatch(context(), src, dest, mid, msg,
+                                   serialized_msg)
+          && mid.is_request()) {
+        detail::sync_request_bouncer srb{exit_reason::remote_link_unreachable};
+        srb(src, mid);
+      }
+    },
     // received from some system calls like whereis
     [=](forward_atom, const node_id& dest_node, atom_value dest_name,
         const message& msg) -> result<message> {

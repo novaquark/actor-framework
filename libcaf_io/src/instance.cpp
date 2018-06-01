@@ -372,6 +372,29 @@ bool instance::dispatch(execution_unit* ctx, const strong_actor_ptr& sender,
   return true;
 }
 
+bool instance::dispatch(execution_unit* ctx, const strong_actor_ptr& sender,
+                        const strong_actor_ptr& receiver, message_id mid,
+                        const message& msg, std::vector<char>& serialized_msg) {
+  CAF_LOG_TRACE(CAF_ARG(sender) << CAF_ARG(receiver)
+                << CAF_ARG(mid) << CAF_ARG(msg));
+  CAF_ASSERT(receiver && system().node() != receiver->node());
+  auto path = lookup(receiver->node());
+  if (!path) {
+    notify<hook::message_sending_failed>(sender, receiver, mid, msg);
+    return false;
+  }
+  auto writer = make_callback([&](serializer& sink) -> error {
+    return sink.apply_raw(serialized_msg.size(), serialized_msg.data());
+  });
+  header hdr{message_type::dispatch_message, 0, 0, mid.integer_value(),
+             sender ? sender->node() : this_node(), receiver->node(),
+             sender ? sender->id() : invalid_actor_id, receiver->id()};
+  write(ctx, path->wr_buf, hdr, &writer);
+  flush(*path);
+  notify<hook::message_sent>(sender, path->next_hop, receiver, mid, msg);
+  return true;
+}
+
 void instance::write(execution_unit* ctx, buffer_type& buf,
                      header& hdr, payload_writer* pw) {
   CAF_LOG_TRACE(CAF_ARG(hdr));

@@ -152,6 +152,11 @@ public:
                 const strong_actor_ptr& receiver,
                 message_id mid, const message& msg);
 
+  /// Returns `true` if a path to destination existed, `false` otherwise.
+  bool dispatch(execution_unit* ctx, const strong_actor_ptr& sender,
+                const strong_actor_ptr& receiver,
+                message_id mid, const message& msg, std::vector<char>& buf);
+
   /// Returns the actor namespace associated to this BASP protocol instance.
   proxy_registry& proxies() {
     return callee_.proxies();

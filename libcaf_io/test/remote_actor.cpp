@@ -176,7 +176,7 @@ CAF_TEST(remote_link) {
   auto linker = client_side.spawn(linking_actor, mirror);
   scoped_actor self{client_side};
   self->wait_for(linker);
-  CAF_MESSAGE("linker exited");
+  CAF_MESSAGE("linker exited, wait for mirror");
   self->wait_for(mirror);
   CAF_MESSAGE("mirror exited");
 }

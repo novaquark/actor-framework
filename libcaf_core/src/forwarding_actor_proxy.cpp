@@ -18,6 +18,7 @@
  ******************************************************************************/
 
 #include <utility>
+#include <vector>
 
 #include "caf/forwarding_actor_proxy.hpp"
 
@@ -26,6 +27,7 @@
 #include "caf/logger.hpp"
 #include "caf/stream_msg.hpp"
 #include "caf/mailbox_element.hpp"
+#include "caf/binary_serializer.hpp"
 
 namespace caf {
 
@@ -39,21 +41,16 @@ forwarding_actor_proxy::~forwarding_actor_proxy() {
   anon_send(broker_, make_message(delete_atom::value, node(), id()));
 }
 
-void forwarding_actor_proxy::forward_msg(strong_actor_ptr sender,
-                                         message_id mid, message msg,
-                                         const forwarding_stack* fwd) {
-  CAF_LOG_TRACE(CAF_ARG(id()) << CAF_ARG(sender)
-                << CAF_ARG(mid) << CAF_ARG(msg));
-  if (msg.match_elements<exit_msg>())
-    unlink_from(msg.get_as<exit_msg>(0).source);
-  forwarding_stack tmp;
+void forwarding_actor_proxy::forward_msg(message msg) {
+  CAF_LOG_TRACE(CAF_ARG(id()) << CAF_ARG(sender) << CAF_ARG(msg));
+  // Forward to BASP broker.
+  forwarding_stack fwd;
   shared_lock<detail::shared_spinlock> guard(mtx_);
   if (broker_)
     broker_->enqueue(nullptr, invalid_message_id,
-                     make_message(forward_atom::value, std::move(sender),
-                                  fwd != nullptr ? *fwd : tmp,
-                                  strong_actor_ptr{ctrl()}, mid,
-                                  std::move(msg)),
+                     make_message(forward_atom::value, strong_actor_ptr{ctrl()},
+                                  fwd, strong_actor_ptr{ctrl()},
+                                  message_id::make(), std::move(msg)),
                      nullptr);
 }
 
@@ -61,14 +58,29 @@ void forwarding_actor_proxy::enqueue(mailbox_element_ptr what,
                                      execution_unit*) {
   CAF_PUSH_AID(0);
   CAF_ASSERT(what);
-  forward_msg(std::move(what->sender), what->mid,
-              what->move_content_to_message(), &what->stages);
+  // Extract contents from mailbox element.
+  auto sender =std::move(what->sender);
+  auto mid = what->mid;
+  auto stages = std::move(what->stages);
+  auto msg = what->move_content_to_message();
+  if (msg.match_elements<exit_msg>())
+    unlink_from(msg.get_as<exit_msg>(0).source);
+  // Serialize message.
+  std::vector<char> buf;
+  binary_serializer bs{home_system(), buf};
+  auto err = bs(stages, msg);
+  shared_lock<detail::shared_spinlock> guard(mtx_);
+  if (broker_)
+    broker_->enqueue(nullptr, invalid_message_id,
+                     make_message(forward_atom::value, std::move(sender),
+                                  strong_actor_ptr{ctrl()}, mid, std::move(msg),
+                                  std::move(buf)),
+                     nullptr);
 }
 
 bool forwarding_actor_proxy::add_backlink(abstract_actor* x) {
   if (monitorable_actor::add_backlink(x)) {
-    forward_msg(ctrl(), invalid_message_id,
-                make_message(link_atom::value, x->ctrl()));
+    forward_msg(make_message(link_atom::value, x->ctrl()));
     return true;
   }
   return false;
@@ -76,8 +88,7 @@ bool forwarding_actor_proxy::add_backlink(abstract_actor* x) {
 
 bool forwarding_actor_proxy::remove_backlink(abstract_actor* x) {
   if (monitorable_actor::remove_backlink(x)) {
-    forward_msg(ctrl(), invalid_message_id,
-                make_message(unlink_atom::value, x->ctrl()));
+    forward_msg(make_message(unlink_atom::value, x->ctrl()));
     return true;
   }
   return false;

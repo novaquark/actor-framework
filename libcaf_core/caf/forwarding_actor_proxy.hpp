@@ -45,8 +45,7 @@ public:
   void kill_proxy(execution_unit* ctx, error rsn) override;
 
 private:
-  void forward_msg(strong_actor_ptr sender, message_id mid, message msg,
-                   const forwarding_stack* fwd = nullptr);
+  void forward_msg(message msg);
 
   mutable detail::shared_spinlock mtx_;
   actor broker_;
