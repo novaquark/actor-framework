@@ -814,10 +814,10 @@ public:
 # ifdef CAF_ENABLE_INSTRUMENTATION
   template <class... Ts>
   void register_request(message_id mid, const Ts&... xs) {
-//    if (context() != nullptr) {
-//      auto cid = instrumentation::get_msgtype(xs...);
-//      responses_times_.emplace(mid, std::make_pair(make_timestamp(), cid));
-//    }
+    if (context() != nullptr) {
+      auto cid = instrumentation::get_msgtype(xs...);
+      responses_times_.emplace(mid, std::make_pair(make_timestamp(), cid));
+    }
   }
   void record_response(message_id mid);
 # endif // CAF_ENABLE_INSTRUMENTATION
