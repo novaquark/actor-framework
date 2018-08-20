@@ -736,17 +736,17 @@ bool scheduled_actor::add_source(const stream_manager_ptr& mgr,
 
 # ifdef CAF_ENABLE_INSTRUMENTATION
   void scheduled_actor::record_response(message_id mid) {
-    if (context() != nullptr) {
-      auto rp_time = responses_times_.find(mid);
-      if (rp_time != responses_times_.end()) {
-        auto req_wait_time = timestamp_ago_ns(rp_time->second.first);
-        if (allow_individual_instrumentation()) {
-          context()->stats().record_request_individual(instrumentation::get_instrumented_actor_id(*this), rp_time->second.second, req_wait_time);
-        } else {
-          context()->stats().record_request_aggregate(typeid(*this), rp_time->second.second, req_wait_time);
-        }
-      }
-    }
+//    if (context() != nullptr) {
+//      auto rp_time = responses_times_.find(mid);
+//      if (rp_time != responses_times_.end()) {
+//        auto req_wait_time = timestamp_ago_ns(rp_time->second.first);
+//        if (allow_individual_instrumentation()) {
+//          context()->stats().record_request_individual(instrumentation::get_instrumented_actor_id(*this), rp_time->second.second, req_wait_time);
+//        } else {
+//          context()->stats().record_request_aggregate(typeid(*this), rp_time->second.second, req_wait_time);
+//        }
+//      }
+//    }
   }
 # endif
 } // namespace caf
