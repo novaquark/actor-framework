@@ -220,6 +220,12 @@ private:
   void* operator new[](size_t);
   abstract_actor(const abstract_actor&) = delete;
   abstract_actor& operator=(const abstract_actor&) = delete;
+#ifdef CAF_ENABLE_OPENTRACING
+  std::string pretty_name_;
+public:
+  std::string const& pretty_name() { return pretty_name_;}
+  void set_pretty_name(std::string const& n) { pretty_name_ = n;}
+#endif
 };
 
 } // namespace caf

@@ -119,6 +119,7 @@ pretty_no("CAF_NO_OPENSSL")
 pretty_no("CAF_NO_PYTHON")
 pretty_no("CAF_NO_TOOLS")
 pretty_no("CAF_NO_SUMMARY")
+pretty_no("CAF_ENABLE_OPENTRACING")
 
 if(NOT CAF_NO_IO)
   set(CAF_NO_IO no)
@@ -227,6 +228,18 @@ endif()
 # set -fno-exception if requested
 if(CAF_FORCE_NO_EXCEPTIONS)
   build_string("EXTRA_FLAGS" "-fno-exceptions")
+endif()
+# Enable opentracing if requested
+if(CAF_ENABLE_OPENTRACING)
+  find_path(OPENTRACING_INCLUDE opentracing/span.h)
+  if (NOT OPENTRACING_INCLUDE)
+    message(FATAL_ERROR "opentracing include directory not found, specify it in CMAKE_INCLUDE_PATH")
+  endif()
+  find_library(OPENTRACING_LIB opentracing)
+  if (NOT OPENTRACING_LIB)
+    message(FATAL_ERROR "libopentracing not found, specify the library path in CMAKE_PREFIX_PATH")
+  endif()
+  build_string("EXTRA_FLAGS" "-I${OPENTRACING_INCLUDE}" )
 endif()
 # enable a ton of warnings if --more-clang-warnings is used
 if(CAF_MORE_WARNINGS)
@@ -484,6 +497,9 @@ endmacro()
 
 # build core and I/O library
 add_caf_lib(core)
+if (CAF_ENABLE_OPENTRACING)
+  list(APPEND CAF_EXTRA_LDFLAGS ${OPENTRACING_LIB})
+endif()
 add_optional_caf_lib(io)
 
 # build SSL module if OpenSSL library is available
@@ -719,6 +735,7 @@ if(NOT CAF_NO_SUMMARY)
         "\nLog level:             ${LOG_LEVEL_STR}"
         "\nWith mem. mgmt.:       ${CAF_BUILD_MEM_MANAGEMENT}"
         "\nWith exceptions:       ${CAF_BUILD_WITH_EXCEPTIONS}"
+        "\nWith opentracing:      ${CAF_ENABLE_OPENTRACING}"
         "\n"
         "\nBuild I/O module:      ${CAF_BUILD_IO}"
         "\nBuild tools:           ${CAF_BUILD_TOOLS}"

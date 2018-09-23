@@ -22,6 +22,7 @@
 
 #include "caf/message_handler.hpp"
 #include "caf/make_type_erased_tuple_view.hpp"
+#include "caf/opentracing.hpp"
 
 namespace caf {
 namespace detail {
@@ -97,6 +98,11 @@ behavior_impl::invoke_empty(detail::invoke_result_visitor& f) {
 match_case::result behavior_impl::invoke(detail::invoke_result_visitor& f,
                                          type_erased_tuple& xs) {
   auto msg_token = xs.type_token();
+#ifdef CAF_ENABLE_OPENTRACING
+  tracing::ScopedContext ctx(xs.context());
+  // FIXME: check for atom as first argument and use that
+  tracing::ScopedTrace trace(xs.stringify());
+#endif
   for (auto i = begin_; i != end_; ++i)
     if (i->type_token == msg_token)
       switch (i->ptr->invoke(f, xs)) {

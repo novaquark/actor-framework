@@ -20,12 +20,20 @@
 
 #include "caf/config.hpp"
 #include "caf/error.hpp"
+#include "caf/opentracing.hpp"
 #include "caf/raise_error.hpp"
 
 #include "caf/detail/try_match.hpp"
 
 namespace caf {
 
+type_erased_tuple::type_erased_tuple()
+#ifdef CAF_ENABLE_OPENTRACING
+: context_(tracing::getCurrentContext())
+#endif
+{
+  // nop
+}
 type_erased_tuple::~type_erased_tuple() {
   // nop
 }

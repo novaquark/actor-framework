@@ -43,7 +43,7 @@ public:
 
   // -- constructors, destructors, and assignment operators --------------------
 
-  type_erased_tuple() = default;
+  type_erased_tuple();
   type_erased_tuple(const type_erased_tuple&) = default;
   type_erased_tuple& operator=(const type_erased_tuple&) = default;
 
@@ -220,6 +220,11 @@ private:
     detail::apply_args(fun, detail::get_indices(tk), xs);
     return unit;
   }
+#ifdef CAF_ENABLE_OPENTRACING
+  std::string context_;
+public:
+  std::string const& context() { return context_;}
+#endif
 };
 
 /// @relates type_erased_tuple

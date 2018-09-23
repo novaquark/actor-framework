@@ -79,6 +79,7 @@ set(LIBCAF_CORE_SRCS
   src/message_view.cpp
   src/monitorable_actor.cpp
   src/node_id.cpp
+  src/opentracing.cpp
   src/outbound_path.cpp
   src/pec.cpp
   src/pretty_type_name.cpp

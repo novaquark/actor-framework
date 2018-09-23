@@ -65,10 +65,10 @@ public:
 
   // -- constructors, destructors, and assignment operators --------------------
 
-  message() noexcept = default;
+  message() = default;
   message(none_t) noexcept;
-  message(const message&) noexcept = default;
-  message& operator=(const message&) noexcept = default;
+  message(const message&) = default;
+  message& operator=(const message&) = default;
 
   message(message&&) noexcept;
   message& operator=(message&&) noexcept;

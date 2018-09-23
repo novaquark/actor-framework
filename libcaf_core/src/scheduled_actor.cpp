@@ -22,6 +22,7 @@
 #include "caf/actor_system_config.hpp"
 #include "caf/config.hpp"
 #include "caf/inbound_path.hpp"
+#include "caf/opentracing.hpp"
 #include "caf/to_string.hpp"
 
 #include "caf/scheduler/abstract_coordinator.hpp"
@@ -611,6 +612,9 @@ scheduled_actor::categorize(mailbox_element& x) {
 }
 
 invoke_message_result scheduled_actor::consume(mailbox_element& x) {
+#ifdef CAF_ENABLE_OPENTRACING
+  tracing::ScopedNamePrefix snp(pretty_name());
+#endif
   CAF_LOG_TRACE(CAF_ARG(x));
   current_element_ = &x;
   CAF_LOG_RECEIVE_EVENT(current_element_);
@@ -635,6 +639,9 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 # ifdef CAF_ENABLE_INSTRUMENTATION
     record_response(x.mid);
 # endif
+#ifdef CAF_ENABLE_OPENTRACING
+    tracing::ScopedNamePrefix trace_name(pretty_name() + ":response");
+#endif
     if (!invoke(this, f, x)) {
       // try again with error if first attempt failed
       auto msg = make_message(make_error(sec::unexpected_response,
@@ -655,6 +662,9 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 # endif
     auto bhvr = std::move(mrh->second);
     multiplexed_responses_.erase(mrh);
+#ifdef CAF_ENABLE_OPENTRACING
+    tracing::ScopedNamePrefix trace_name(pretty_name() + ":response");
+#endif
     if (!invoke(this, bhvr, x)) {
       // try again with error if first attempt failed
       auto msg = make_message(make_error(sec::unexpected_response,
