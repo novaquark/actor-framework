@@ -240,6 +240,7 @@ if(CAF_ENABLE_OPENTRACING)
     message(FATAL_ERROR "libopentracing not found, specify the library path in CMAKE_PREFIX_PATH")
   endif()
   build_string("EXTRA_FLAGS" "-I${OPENTRACING_INCLUDE}" )
+  list(APPEND CAF_EXTRA_LDFLAGS ${OPENTRACING_LIB})
 endif()
 # enable a ton of warnings if --more-clang-warnings is used
 if(CAF_MORE_WARNINGS)
@@ -497,9 +498,6 @@ endmacro()
 
 # build core and I/O library
 add_caf_lib(core)
-if (CAF_ENABLE_OPENTRACING)
-  list(APPEND CAF_EXTRA_LDFLAGS ${OPENTRACING_LIB})
-endif()
 add_optional_caf_lib(io)
 
 # build SSL module if OpenSSL library is available
