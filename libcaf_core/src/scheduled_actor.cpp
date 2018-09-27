@@ -613,7 +613,7 @@ scheduled_actor::categorize(mailbox_element& x) {
 
 invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 #ifdef CAF_ENABLE_OPENTRACING
-  tracing::ScopedNamePrefix snp(pretty_name());
+  tracing::ScopedNamePrefix snp(name());
 #endif
   CAF_LOG_TRACE(CAF_ARG(x));
   current_element_ = &x;
@@ -640,7 +640,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     record_response(x.mid);
 # endif
 #ifdef CAF_ENABLE_OPENTRACING
-    tracing::ScopedNamePrefix trace_name(pretty_name() + ":response");
+    tracing::ScopedNamePrefix trace_name(std::string(name()) + ":response");
 #endif
     if (!invoke(this, f, x)) {
       // try again with error if first attempt failed
@@ -663,7 +663,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
     auto bhvr = std::move(mrh->second);
     multiplexed_responses_.erase(mrh);
 #ifdef CAF_ENABLE_OPENTRACING
-    tracing::ScopedNamePrefix trace_name(pretty_name() + ":response");
+    tracing::ScopedNamePrefix trace_name(std::string(name()) + ":response");
 #endif
     if (!invoke(this, bhvr, x)) {
       // try again with error if first attempt failed
