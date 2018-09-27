@@ -31,6 +31,15 @@ namespace caf {
       static thread_local std::string traceNamePrefix;
       static thread_local std::unique_ptr<opentracing::Span> currentSpan;
       static thread_local std::unique_ptr<opentracing::SpanContext> currentContext;
+      static TraceAppend traceAppend = TraceAppend::FirstAtom;
+    }
+
+    void setTraceAppend(TraceAppend append) {
+      traceAppend = append;
+    }
+
+    TraceAppend getTraceAppend() {
+      return traceAppend;
     }
 
     std::string getCurrentContext() {
@@ -100,6 +109,8 @@ namespace caf {
 
 namespace caf {
   namespace tracing {
+    void setTraceAppend(TraceAppend append) {}
+    TraceAppend getTraceAppend() {}
     std::string getCurrentContext() {}
     void setContext(std::string const& context) {}
     void resetContext() {}

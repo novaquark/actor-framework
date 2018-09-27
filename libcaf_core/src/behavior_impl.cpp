@@ -100,8 +100,28 @@ match_case::result behavior_impl::invoke(detail::invoke_result_visitor& f,
   auto msg_token = xs.type_token();
 #ifdef CAF_ENABLE_OPENTRACING
   tracing::ScopedContext ctx(xs.context());
-  // FIXME: check for atom as first argument and use that
-  tracing::ScopedTrace trace(xs.stringify());
+  std::string trace_name;
+  switch (tracing::getTraceAppend())
+  {
+  case tracing::TraceAppend::Nothing:
+    break;
+  case tracing::TraceAppend::FirstAtom:
+    if (xs.size() > 0)
+    {
+      type_erased_tuple::rtti_pair type = xs.type(0);
+      if (type.first == type_nr<atom_value>::value)
+        trace_name = '(' + xs.stringify(0) + ')';
+    }
+    break;
+  case tracing::TraceAppend::FirstArgument:
+    if (xs.size() > 0)
+      trace_name = '(' + xs.stringify(0) + ')';
+    break;
+  case tracing::TraceAppend::AllArguments:
+    trace_name = xs.stringify();
+    break;
+  }
+  tracing::ScopedTrace trace(trace_name);
 #endif
   for (auto i = begin_; i != end_; ++i)
     if (i->type_token == msg_token)

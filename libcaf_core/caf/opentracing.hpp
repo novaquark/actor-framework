@@ -24,6 +24,18 @@
 
 namespace caf {
   namespace tracing {
+    enum class TraceAppend {
+      /// Append nothing to the trace name.
+      Nothing,
+      /// Append first argument to the trace name if it is an atom.
+      FirstAtom,
+      /// Append first argument to the trace name unconditionally.
+      FirstArgument,
+      /// Append the whole argument list
+      AllArguments,
+    };
+    void setTraceAppend(TraceAppend append);
+    TraceAppend getTraceAppend();
     std::string getCurrentContext();
     void setContext(std::string const& context);
     void resetContext();
