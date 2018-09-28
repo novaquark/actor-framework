@@ -19,8 +19,10 @@
 #include "caf/type_erased_tuple.hpp"
 
 #include "caf/config.hpp"
+#include "caf/deserializer.hpp"
 #include "caf/error.hpp"
 #include "caf/opentracing.hpp"
+#include "caf/serializer.hpp"
 #include "caf/raise_error.hpp"
 
 #include "caf/detail/try_match.hpp"
@@ -44,6 +46,9 @@ error type_erased_tuple::load(deserializer& source) {
     if (e)
       return e;
   }
+#ifdef CAF_ENABLE_OPENTRACING
+    source(context_); // ignore errors
+#endif
   return none;
 }
 
@@ -74,7 +79,11 @@ error type_erased_tuple::save(serializer& sink) const {
     if (e)
       return e;
   }
+#ifdef CAF_ENABLE_OPENTRACING
+  return sink(context_);
+#else
   return none;
+#endif
 }
 
 bool type_erased_tuple::matches(size_t pos, uint16_t nr,

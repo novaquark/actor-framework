@@ -39,7 +39,9 @@ message::message(none_t) noexcept {
   // nop
 }
 
-message::message(message&& other) noexcept : vals_(std::move(other.vals_)) {
+message::message(message&& other) noexcept
+ : type_erased_tuple(std::move(other))
+ , vals_(std::move(other.vals_)) {
   // nop
 }
 
@@ -48,6 +50,9 @@ message::message(data_ptr ptr) noexcept : vals_(std::move(ptr)) {
 }
 
 message& message::operator=(message&& other) noexcept {
+#ifdef CAF_ENABLE_OPENTRACING
+  std::swap(context_, other.context_);
+#endif
   vals_.swap(other.vals_);
   return *this;
 }
@@ -148,6 +153,12 @@ error message::load(deserializer& source) {
     else
       i = eos;
   } while (i != eos);
+#ifdef CAF_ENABLE_OPENTRACING
+  context_.clear();
+  err = source(context_);
+  if (err)
+    return err;
+#endif
   err = source.end_object();
   if (err)
     return err;
@@ -193,6 +204,9 @@ error message::save(serializer& sink) const {
   };
   return error::eval([&] { return sink.begin_object(zero, tname); },
                      [&] { return save_loop();  },
+#ifdef CAF_ENABLE_OPENTRACING
+                     [&] { return sink(context_); },
+#endif
                      [&] { return sink.end_object(); });
 }
 

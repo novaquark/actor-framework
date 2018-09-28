@@ -221,6 +221,7 @@ private:
     return unit;
   }
 #ifdef CAF_ENABLE_OPENTRACING
+protected:
   std::string context_;
 public:
   std::string const& context() { return context_;}
