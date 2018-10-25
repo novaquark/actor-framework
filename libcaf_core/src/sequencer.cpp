@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -77,7 +76,7 @@ sequencer::message_types_set sequencer::message_types() const {
   return msg_types_;
 }
 
-void sequencer::on_cleanup() {
+void sequencer::on_cleanup(const error&) {
   f_.reset();
   g_.reset();
 }

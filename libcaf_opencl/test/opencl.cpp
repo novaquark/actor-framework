@@ -122,7 +122,7 @@ constexpr const char* kernel_source = R"__(
     }
   }
 
-  kernel void use_local(global int* restrict values, 
+  kernel void use_local(global int* restrict values,
                         local  int* restrict buf) {
     size_t lid = get_local_id(0);
     size_t gid = get_group_id(0);
@@ -134,7 +134,7 @@ constexpr const char* kernel_source = R"__(
     values[gid * gs + lid] = buf[lid];
   }
 
-  kernel void test_order(local  int* buf, 
+  kernel void test_order(local  int* buf,
                          global int* restrict values) {
     size_t lid = get_local_id(0);
     size_t gid = get_group_id(0);
@@ -146,7 +146,7 @@ constexpr const char* kernel_source = R"__(
     values[gid * gs + lid] = buf[lid];
   }
 
-  kernel void use_private(global  int* restrict buf, 
+  kernel void use_private(global  int* restrict buf,
                           private int  val) {
     buf[get_global_id(0)] += val;
   }
@@ -161,11 +161,13 @@ constexpr const char* kernel_source = R"__(
   }
 )__";
 
+#ifndef CAF_NO_EXCEPTIONS
 constexpr const char* kernel_source_error = R"__(
   kernel void missing(global int*) {
     size_t semicolon_missing
   }
 )__";
+#endif // CAF_NO_EXCEPTIONS
 
 constexpr const char* kernel_source_compiler_flag = R"__(
   kernel void compiler_flag(global const int* restrict input,
@@ -206,11 +208,11 @@ public:
     assert(data_.size() == num_elements);
   }
 
-  float& operator()(size_t column, size_t row) {
+  int& operator()(size_t column, size_t row) {
     return data_[column + row * Size];
   }
 
-  const float& operator()(size_t column, size_t row) const {
+  const int& operator()(size_t column, size_t row) const {
     return data_[column + row * Size];
   }
 
@@ -398,19 +400,15 @@ void test_opencl(actor_system& sys) {
                            expected2.data(), result.data());
     }, others >> wrong_msg
   );
+#ifndef CAF_NO_EXCEPTIONS
   CAF_MESSAGE("Expecting exception (compiling invalid kernel, "
               "semicolon is missing).");
   try {
     /* auto expected_error = */ mngr.create_program(kernel_source_error);
   } catch (const exception& exc) {
-    std::string starts_with("clBuildProgram: CL_BUILD_PROGRAM_FAILURE");
-    auto cond = (strncmp(exc.what(), starts_with.c_str(),
-                         starts_with.size()) == 0);
-    CAF_CHECK(cond);
-    if (!cond)
-      CAF_ERROR("Wrong exception cought for program build failure.");
+    CAF_MESSAGE("got: " << exc.what());
   }
-
+#endif // CAF_NO_EXCEPTIONS
   // create program with opencl compiler flags
   auto prog5 = mngr.create_program(kernel_source_compiler_flag, compiler_flag);
   opencl::nd_range range5{dims{array_size}};
@@ -458,7 +456,7 @@ void test_opencl(actor_system& sys) {
     return problem_size;
   };
   // constant memory arguments
-  const ivec arr7{problem_size};
+  const ivec arr7{static_cast<int>(problem_size)};
   auto w7 = mngr.spawn(kernel_source, kn_const,
                        opencl::nd_range{dims{problem_size}},
                        opencl::in<int>{},
@@ -759,7 +757,7 @@ void test_in_val_out_val(actor_system& sys) {
   // calculator function for getting the size of the output
   auto res_size2 = [](const ivec&) { return problem_size; };
   // constant memory arguments
-  const ivec input2{problem_size};
+  const ivec input2{static_cast<int>(problem_size)};
   auto w6 = mngr.spawn(kernel_source, kn_const,
                            nd_range{dims{problem_size}},
                            in<int>{}, out<int>{res_size2});

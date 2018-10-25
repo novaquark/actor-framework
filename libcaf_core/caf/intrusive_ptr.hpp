@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,17 +16,17 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_INTRUSIVE_PTR_HPP
-#define CAF_INTRUSIVE_PTR_HPP
+#pragma once
 
-#include <string>
-#include <cstddef>
-#include <cinttypes>
 #include <algorithm>
+#include <cstddef>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 
+#include "caf/detail/append_hex.hpp"
 #include "caf/detail/comparable.hpp"
+#include "caf/detail/type_traits.hpp"
 
 namespace caf {
 
@@ -216,13 +215,15 @@ bool operator!=(const T* x, const intrusive_ptr<T>& y) {
 
 /// @relates intrusive_ptr
 template <class T, class U>
-bool operator==(const intrusive_ptr<T>& x, const intrusive_ptr<U>& y) {
+detail::enable_if_t<detail::is_comparable<T*, U*>::value, bool>
+operator==(const intrusive_ptr<T>& x, const intrusive_ptr<U>& y) {
   return x.get() == y.get();
 }
 
 /// @relates intrusive_ptr
 template <class T, class U>
-bool operator!=(const intrusive_ptr<T>& x, const intrusive_ptr<U>& y) {
+detail::enable_if_t<detail::is_comparable<T*, U*>::value, bool>
+operator!=(const intrusive_ptr<T>& x, const intrusive_ptr<U>& y) {
   return x.get() != y.get();
 }
 
@@ -245,14 +246,11 @@ bool operator<(const T* x, const intrusive_ptr<T>& y) {
 
 template <class T>
 std::string to_string(const intrusive_ptr<T>& x) {
+  std::string result;
   auto v = reinterpret_cast<uintptr_t>(x.get());
-  // we convert to hex representation, i.e.,
-  // one byte takes two characters + null terminator + "0x" prefix
-  char buf[sizeof(v) * 2 + 3];
-  sprintf(buf, "%" PRIxPTR, v);
-  return buf;
+  detail::append_hex(result, reinterpret_cast<uint8_t*>(&v), sizeof(v));
+  return result;
 }
 
 } // namespace caf
 
-#endif // CAF_INTRUSIVE_PTR_HPP

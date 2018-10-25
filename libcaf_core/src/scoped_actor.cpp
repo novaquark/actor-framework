@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -31,7 +30,7 @@ namespace {
 class impl : public blocking_actor {
 public:
   impl(actor_config& cfg) : blocking_actor(cfg) {
-    setf(is_detached_flag);
+    // nop
   }
 
   void act() override {
@@ -41,6 +40,15 @@ public:
   const char* name() const override {
     return "scoped_actor";
   }
+
+  void launch(execution_unit*, bool, bool hide) override {
+    CAF_PUSH_AID_FROM_PTR(this);
+    CAF_LOG_TRACE(CAF_ARG(hide));
+    CAF_ASSERT(getf(is_blocking_flag));
+    if (!hide)
+      register_at_system();
+    initialize();
+  }
 };
 
 } // namespace <anonymous>
@@ -48,12 +56,11 @@ public:
 scoped_actor::scoped_actor(actor_system& sys, bool hide) : context_(&sys) {
   CAF_SET_LOGGER_SYS(&sys);
   actor_config cfg{&context_};
-  self_ = make_actor<impl, strong_actor_ptr>(sys.next_actor_id(), sys.node(),
-                                             &sys, cfg);
-  if (!hide)
-    ptr()->register_at_system();
+  if (hide)
+    cfg.flags |= abstract_actor::is_hidden_flag;
+  auto hdl = sys.spawn_impl<impl, no_spawn_options>(cfg);
+  self_ = actor_cast<strong_actor_ptr>(std::move(hdl));
   prev_ = CAF_SET_AID(self_->id());
-  ptr()->initialize();
 }
 
 scoped_actor::~scoped_actor() {

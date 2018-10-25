@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TYPED_BEHAVIOR_HPP
-#define CAF_TYPED_BEHAVIOR_HPP
+#pragma once
 
 #include "caf/behavior.hpp"
 #include "caf/deduce_mpi.hpp"
@@ -263,4 +261,3 @@ struct is_typed_behavior<typed_behavior<Sigs...>> : std::true_type { };
 
 } // namespace caf
 
-#endif // CAF_TYPED_BEHAVIOR_HPP

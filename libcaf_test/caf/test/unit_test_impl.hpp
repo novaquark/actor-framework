@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TEST_UNIT_TEST_IMPL_HPP
-#define CAF_TEST_UNIT_TEST_IMPL_HPP
+#pragma once
 
 #include <regex>
 #include <cctype>
@@ -93,11 +91,12 @@ void watchdog::stop() {
   delete s_watchdog;
 }
 
-test::test(std::string test_name)
+test::test(std::string test_name, bool disabled_by_default)
     : expected_failures_(0),
       name_(std::move(test_name)),
       good_(0),
-      bad_(0) {
+      bad_(0),
+      disabled_(disabled_by_default) {
   // nop
 }
 
@@ -297,6 +296,8 @@ bool engine::run(bool colorize,
   || (defined(__clang__) && !defined(_LIBCPP_VERSION))
   // regex implementation is broken prior to 4.9
   using strvec = std::vector<std::string>;
+  using whitelist_type = strvec;
+  using blacklist_type = strvec;
   auto from_psv = [](const std::string& psv) -> strvec {
     // psv == pipe-separated-values
     strvec result;
@@ -319,6 +320,8 @@ bool engine::run(bool colorize,
                || std::binary_search(whitelist.begin(), whitelist.end(), x));
   };
 # else
+  using whitelist_type = std::regex;
+  using blacklist_type = std::regex;
   std::regex suites{suites_str};
   std::regex tests{tests_str};
   std::regex not_suites;
@@ -336,6 +339,14 @@ bool engine::run(bool colorize,
            && !std::regex_search(x, blacklist);
   };
 # endif
+  auto test_enabled = [&](const whitelist_type& whitelist,
+                          const blacklist_type& blacklist,
+                          const test& x) {
+    // Disabled tests run iff explicitly requested by the user, i.e.,
+    // tests_str is not the ".*" catch-all default.
+    return (!x.disabled() || tests_str != ".*")
+           && enabled(whitelist, blacklist, x.name());
+  };
   std::vector<std::string> failed_tests;
   for (auto& p : instance().suites_) {
     if (!enabled(suites, not_suites, p.first))
@@ -345,7 +356,7 @@ bool engine::run(bool colorize,
     bool displayed_header = false;
     size_t tests_ran = 0;
     for (auto& t : p.second) {
-      if (!enabled(tests, not_tests, t->name()))
+      if (!test_enabled(tests, not_tests, *t))
         continue;
       instance().current_test_ = t.get();
       ++tests_ran;
@@ -358,7 +369,7 @@ bool engine::run(bool colorize,
                     << '\n';
       auto start = std::chrono::high_resolution_clock::now();
       watchdog::start(max_runtime());
-      t->run();
+      t->run_test_impl();
       watchdog::stop();
       auto stop = std::chrono::high_resolution_clock::now();
       auto elapsed =
@@ -572,4 +583,3 @@ int main(int argc, char** argv) {
 }
 #endif // CAF_TEST_UNIT_TEST_IMPL_HPP
 
-#endif // CAF_TEST_UNIT_TEST_IMPL_HPP

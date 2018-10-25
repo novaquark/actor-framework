@@ -6,7 +6,6 @@
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
  * Copyright (C) 2011 - 2016                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  * Raphael Hiesgen <raphael.hiesgen (at) haw-hamburg.de>                      *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
@@ -18,25 +17,24 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
- #include "caf/opencl/opencl_err.hpp"
+#include "caf/opencl/opencl_err.hpp"
+
+#include "caf/logger.hpp"
 
 namespace caf {
 namespace opencl {
 
-void throwcl(const char* fname, cl_int err) {
+void throwcl(const char*, cl_int err) {
   if (err != CL_SUCCESS) {
-    std::string errstr = fname;
-    errstr += ": ";
-    errstr += opencl_error(err);
-    throw std::runtime_error(std::move(errstr));
+    CAF_RAISE_ERROR("throwcl: unrecoverable OpenCL error");
   }
 }
 
-void pfn_notify(const char* errinfo, const void*, size_t, void*) {
+void CL_CALLBACK pfn_notify(const char* errinfo, const void*, size_t, void*) {
   CAF_LOG_ERROR("\n##### Error message via pfn_notify #####\n"
                 << errinfo <<
                 "\n########################################");
-  static_cast<void>(errinfo); // remove warning
+  CAF_IGNORE_UNUSED(errinfo);
 }
 
 } // namespace opencl

@@ -6,7 +6,6 @@
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
  * Copyright (C) 2011 - 2016                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,17 +16,17 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_OPENCL_DEVICE_HPP
-#define CAF_OPENCL_DEVICE_HPP
+#pragma once
 
 #include <vector>
 
 #include "caf/sec.hpp"
 
+#include "caf/detail/raw_ptr.hpp"
+
 #include "caf/opencl/global.hpp"
 #include "caf/opencl/opencl_err.hpp"
 
-#include "caf/opencl/detail/raw_ptr.hpp"
 
 namespace caf {
 namespace opencl {
@@ -330,4 +329,3 @@ inline const std::string& device::name() const {
 } // namespace opencl
 } // namespace caf
 
-#endif // CAF_OPENCL_DEVICE_HPP

@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -19,7 +18,7 @@
 
 #include "caf/config.hpp"
 
-#define CAF_SUITE logger 
+#define CAF_SUITE logger
 #include "caf/test/unit_test.hpp"
 
 #include <ctime>
@@ -35,16 +34,16 @@ namespace {
 
 struct fixture {
   fixture() {
-    cfg.scheduler_policy = caf::atom("testing");
+    cfg.set("scheduler.policy", atom("testing"));
   }
 
   void add(logger::field_type kind) {
-    lf.emplace_back(logger::field{kind, nullptr, nullptr});
+    lf.emplace_back(logger::field{kind, std::string{}});
   }
 
   template <size_t N>
   void add(logger::field_type kind, const char (&str)[N]) {
-    lf.emplace_back(logger::field{kind, str, str + (N - 1)}); // exclude \0
+    lf.emplace_back(logger::field{kind, std::string{str, str + (N - 1)}});
   }
 
   template <class F, class... Ts>
@@ -68,7 +67,6 @@ CAF_TEST_FIXTURE_SCOPE(logger_tests, fixture)
 // and finally serialization round-trip
 CAF_TEST(parse_default_format_strings) {
   actor_system sys{cfg};
-  CAF_CHECK_EQUAL(cfg.logger_file_format, file_format);
   add(logger::runtime_field);
   add(logger::plain_text_field, " ");
   add(logger::category_field);
@@ -90,7 +88,7 @@ CAF_TEST(parse_default_format_strings) {
   add(logger::message_field);
   add(logger::newline_field);
   CAF_CHECK_EQUAL(logger::parse_format(file_format), lf);
-#ifdef CAF_LOG_LEVEL
+#if CAF_LOG_LEVEL >= 0
   // Not parsed when compiling without logging enabled.
   CAF_CHECK_EQUAL(sys.logger().file_format(), lf);
 #endif
@@ -108,12 +106,10 @@ CAF_TEST(rendering) {
   time_t t0_t = 0;
   char t0_buf[50];
   CAF_REQUIRE(strftime(t0_buf, sizeof(t0_buf),
-                       "%Y-%m-%d %H:%M:%S", localtime(&t0_t)));
+                       "%Y-%m-%dT%H:%M:%S.000", localtime(&t0_t)));
   CAF_CHECK_EQUAL(render(logger::render_date, t0), t0_buf);
   // Rendering of events.
   logger::event e{
-    nullptr,
-    nullptr,
     CAF_LOG_LEVEL_WARNING,
     "unit.test",
     "void ns::foo::bar()",

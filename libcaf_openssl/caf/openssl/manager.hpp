@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_OPENSSL_MANAGER_HPP
-#define CAF_OPENSSL_MANAGER_HPP
+#pragma once
 
 #include <set>
 #include <string>
@@ -55,13 +53,18 @@ public:
     return system_;
   }
 
+  /// Returns the system-wide configuration.
+  inline const actor_system_config& config() const {
+    return system_.config();
+  }
+
   /// Returns true if configured to require certificate-based authentication
   /// of peers.
   bool authentication_enabled();
 
   /// Returns an OpenSSL manager using the default network backend.
-  /// @warning Creating an OpenSSL manager will fail when using the ASIO
-  ///          network backend or any other custom implementation.
+  /// @warning Creating an OpenSSL manager will fail when using
+  //           a custom implementation.
   /// @throws `logic_error` if the middleman is not loaded or is not using the
   ///         default network backend.
   static actor_system::module* make(actor_system&, detail::type_list<>);
@@ -80,4 +83,3 @@ private:
 } // namespace openssl
 } // namespace caf
 
-#endif // CAF_OPENSSL_MANAGER_HPP

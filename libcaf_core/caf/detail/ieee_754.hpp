@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -21,8 +20,7 @@
  *      Based on http://beej.us/guide/bgnet/examples/pack2.c      *
 \ ******************************************************************************/
 
-#ifndef CAF_DETAIL_IEEE_754_HPP
-#define CAF_DETAIL_IEEE_754_HPP
+#pragma once
 
 #include <cmath>
 #include <cstdint>
@@ -137,4 +135,3 @@ typename ieee_754_trait<T>::float_type unpack754(T i) {
 } // namespace detail
 } // namespace caf
 
-#endif // CAF_DETAIL_IEEE_754_HPP

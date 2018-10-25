@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -20,8 +19,7 @@
 // This file is referenced in the manual, do not modify without updating refs!
 // ConfiguringActorApplications: 50-54
 
-#ifndef CAF_ALLOWED_UNSAFE_MESSAGE_TYPE_HPP
-#define CAF_ALLOWED_UNSAFE_MESSAGE_TYPE_HPP
+#pragma once
 
 #include <type_traits>
 
@@ -53,4 +51,3 @@ struct is_allowed_unsafe_message_type<const T&>
   struct allowed_unsafe_message_type<type_name> : std::true_type {};           \
   }
 
-#endif // CAF_ALLOWED_UNSAFE_MESSAGE_TYPE_HPP

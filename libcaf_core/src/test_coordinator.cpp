@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -21,8 +20,10 @@
 
 #include <limits>
 
-#include "caf/resumable.hpp"
+#include "caf/actor_system_config.hpp"
 #include "caf/monitorable_actor.hpp"
+#include "caf/raise_error.hpp"
+#include "caf/resumable.hpp"
 
 namespace caf {
 namespace scheduler {
@@ -63,50 +64,31 @@ private:
   message_handler mh_;
 };
 
-class dummy_timer : public monitorable_actor {
-public:
-  dummy_timer(actor_config& cfg, test_coordinator* parent)
-      : monitorable_actor(cfg),
-        parent_(parent) {
-    mh_.assign(
-      [&](const duration& d, strong_actor_ptr& from,
-          strong_actor_ptr& to, message_id mid, message& msg) {
-        auto tout = test_coordinator::hrc::now();
-        tout += d;
-        using delayed_msg = test_coordinator::delayed_msg;
-        parent_->delayed_messages.emplace(tout, delayed_msg{std::move(from),
-                                                            std::move(to), mid,
-                                                            std::move(msg)});
-      }
-    );
-  }
-
-  void enqueue(mailbox_element_ptr what, execution_unit*) override {
-    mh_(what->content());
-  }
-
-private:
-  test_coordinator* parent_;
-  message_handler mh_;
-};
-
 } // namespace <anonymous>
 
 test_coordinator::test_coordinator(actor_system& sys) : super(sys) {
   // nop
 }
+
+bool test_coordinator::detaches_utility_actors() const {
+  return false;
+}
+
+detail::test_actor_clock& test_coordinator::clock() noexcept {
+  return clock_;
+}
+
 void test_coordinator::start() {
   dummy_worker worker{this};
   actor_config cfg{&worker};
   auto& sys = system();
-  timer_ = make_actor<dummy_timer, strong_actor_ptr>(
-    sys.next_actor_id(), sys.node(), &sys, cfg, this);
-  printer_ = make_actor<dummy_printer, strong_actor_ptr>(
+  utility_actors_[printer_id] = make_actor<dummy_printer, actor>(
     sys.next_actor_id(), sys.node(), &sys, cfg);
 }
 
 void test_coordinator::stop() {
-  run_dispatch_loop();
+  while (run() > 0)
+    trigger_timeouts();
 }
 
 void test_coordinator::enqueue(resumable* ptr) {
@@ -166,36 +148,6 @@ size_t test_coordinator::run(size_t max_count) {
   return res;
 }
 
-bool test_coordinator::dispatch_once() {
-  auto i = delayed_messages.begin();
-  if (i == delayed_messages.end())
-    return false;
-  auto& dm = i->second;
-  dm.to->enqueue(dm.from, dm.mid, std::move(dm.msg), nullptr);
-  delayed_messages.erase(i);
-  return true;
-}
-
-size_t test_coordinator::dispatch() {
-  size_t res = 0;
-  while (dispatch_once())
-    ++res;
-  return res;
-}
-
-std::pair<size_t, size_t> test_coordinator::run_dispatch_loop() {
-  std::pair<size_t, size_t> res;
-  size_t i = 0;
-  do {
-    auto x = run();
-    auto y = dispatch();
-    res.first += x;
-    res.second += y;
-    i = x + y;
-  } while (i > 0);
-  return res;
-}
-
 void test_coordinator::inline_next_enqueue() {
   after_next_enqueue([=] { run_once_lifo(); });
 }
@@ -207,6 +159,17 @@ void test_coordinator::inline_all_enqueues() {
 void test_coordinator::inline_all_enqueues_helper() {
   run_once_lifo();
   after_next_enqueue([=] { inline_all_enqueues_helper(); });
+}
+
+std::pair<size_t, size_t>
+test_coordinator::run_dispatch_loop(timespan cycle_duration) {
+  size_t messages = 0;
+  size_t timeouts = 0;
+  while (has_job() || has_pending_timeout()) {
+    messages += run();
+    timeouts += advance_time(cycle_duration);
+  }
+  return {messages, timeouts};
 }
 
 } // namespace caf

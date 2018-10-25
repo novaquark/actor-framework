@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_RESPONSE_HANDLE_HPP
-#define CAF_RESPONSE_HANDLE_HPP
+#pragma once
 
 #include <type_traits>
 
@@ -74,6 +72,10 @@ public:
             class E2 = detail::is_handler_for_ef<OnError, error>>
   void then(F f, OnError e) const {
     then_impl(f, e);
+  }
+
+  Self* self() {
+    return self_;
   }
 
 private:
@@ -174,6 +176,9 @@ public:
     self_->varargs_receive(rc, mid_, std::move(ef), std::move(ca));
   }
 
+  Self* self() {
+    return self_;
+  }
 
 private:
   message_id mid_;
@@ -182,4 +187,3 @@ private:
 
 } // namespace caf
 
-#endif // CAF_RESPONSE_HANDLE_HPP

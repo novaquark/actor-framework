@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_SCOPED_ACTOR_HPP
-#define CAF_SCOPED_ACTOR_HPP
+#pragma once
 
 #include "caf/none.hpp"
 #include "caf/actor_cast.hpp"
@@ -89,4 +87,3 @@ std::string to_string(const scoped_actor& x);
 
 } // namespace caf
 
-#endif // CAF_SCOPED_ACTOR_HPP

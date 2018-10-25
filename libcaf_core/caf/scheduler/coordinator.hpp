@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_SCHEDULER_COORDINATOR_HPP
-#define CAF_SCHEDULER_COORDINATOR_HPP
+#pragma once
 
 #include "caf/config.hpp"
 
@@ -27,8 +25,10 @@
 #include <memory>
 #include <condition_variable>
 
-#include "caf/scheduler/worker.hpp"
+#include "caf/detail/set_thread_name.hpp"
+#include "caf/detail/thread_safe_actor_clock.hpp"
 #include "caf/scheduler/abstract_coordinator.hpp"
+#include "caf/scheduler/worker.hpp"
 
 namespace caf {
 namespace scheduler {
@@ -71,15 +71,27 @@ public:
 
 protected:
   void start() override {
-    // initialize workers vector
+    // Create initial state for all workers.
+    typename worker_type::policy_data init{this};
+    // Prepare workers vector.
     auto num = num_workers();
     workers_.reserve(num);
+    // Create worker instanes.
     for (size_t i = 0; i < num; ++i)
-      workers_.emplace_back(new worker_type(i, this, max_throughput_));
-    // start all workers now that all workers have been initialized
+      workers_.emplace_back(new worker_type(i, this, init, max_throughput_));
+    // Start all workers.
     for (auto& w : workers_)
       w->start();
-    // run remaining startup code
+    // Launch an additional background thread for dispatching timeouts and
+    // delayed messages.
+    timer_ = std::thread{[&] {
+      CAF_SET_LOGGER_SYS(&system());
+      detail::set_thread_name("caf.clock");
+      system().thread_started();
+      clock_.run_dispatch_loop();
+      system().thread_terminates();
+    }};
+    // Run remaining startup code.
     super::start();
   }
 
@@ -138,22 +150,36 @@ protected:
     for (auto& w : workers_)
       policy_.foreach_resumable(w.get(), f);
     policy_.foreach_central_resumable(this, f);
+    // stop timer thread
+    clock_.cancel_dispatch_loop();
+    timer_.join();
   }
 
   void enqueue(resumable* ptr) override {
     policy_.central_enqueue(this, ptr);
   }
 
+  detail::thread_safe_actor_clock& clock() noexcept override {
+    return clock_;
+  }
+
 private:
-  // usually of size std::thread::hardware_concurrency()
+  /// System-wide clock.
+  detail::thread_safe_actor_clock clock_;
+
+  /// Set of workers.
   std::vector<std::unique_ptr<worker_type>> workers_;
-  // policy-specific data
+
+  /// Policy-specific data.
   policy_data data_;
-  // instance of our policy object
+
+  /// The policy object.
   Policy policy_;
+
+  /// Thread for managing timeouts and delayed messages.
+  std::thread timer_;
 };
 
 } // namespace scheduler
 } // namespace caf
 
-#endif // CAF_SCHEDULER_COORDINATOR_HPP

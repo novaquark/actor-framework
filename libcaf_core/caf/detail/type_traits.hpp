@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_DETAIL_TYPE_TRAITS_HPP
-#define CAF_DETAIL_TYPE_TRAITS_HPP
+#pragma once
 
 #include <tuple>
 #include <chrono>
@@ -31,6 +29,7 @@
 #include "caf/fwd.hpp"
 #include "caf/timestamp.hpp"
 
+#include "caf/detail/is_one_of.hpp"
 #include "caf/detail/type_list.hpp"
 
 #define CAF_HAS_MEMBER_TRAIT(name)                                             \
@@ -127,19 +126,6 @@ struct disjunction<X, Xs...> {
   static constexpr bool value = X || disjunction<Xs...>::value;
 };
 
-/// Checks wheter `X` is in the template parameter pack Ts.
-template <class X, class... Ts>
-struct is_one_of;
-
-template <class X>
-struct is_one_of<X> : std::false_type {};
-
-template <class X, class... Ts>
-struct is_one_of<X, X, Ts...> : std::true_type {};
-
-template <class X, typename T0, class... Ts>
-struct is_one_of<X, T0, Ts...> : is_one_of<X, Ts...> {};
-
 /// Checks whether `T` is a `std::chrono::duration`.
 template <class T>
 struct is_duration : std::false_type {};
@@ -147,7 +133,7 @@ struct is_duration : std::false_type {};
 template <class Period, class Rep>
 struct is_duration<std::chrono::duration<Period, Rep>> : std::true_type {};
 
-/// Checks wheter `T` is considered a builtin type.
+/// Checks whether `T` is considered a builtin type.
 ///
 /// Builtin types are: (1) all arithmetic types (including time types), (2)
 /// string types from the STL, and (3) built-in types such as `actor_ptr`.
@@ -161,8 +147,8 @@ struct is_builtin {
                                              node_id>::value;
 };
 
-/// Chekcs wheter `T` is primitive, i.e., either an arithmetic
-///    type or convertible to one of STL's string types.
+/// Checks whether `T` is primitive, i.e., either an arithmetic type or
+/// convertible to one of STL's string types.
 template <class T>
 struct is_primitive {
   static constexpr bool value = std::is_arithmetic<T>::value
@@ -172,7 +158,7 @@ struct is_primitive {
                                 || std::is_convertible<T, atom_value>::value;
 };
 
-/// Chekcs wheter `T1` is comparable with `T2`.
+/// Checks whether `T1` is comparable with `T2`.
 template <class T1, typename T2>
 class is_comparable {
   // SFINAE: If you pass a "bool*" as third argument, then
@@ -491,6 +477,20 @@ public:
   static constexpr bool value = std::is_same<bool, result_type>::value;
 };
 
+/// Checks wheter `F` is callable with arguments of types `Ts...`.
+template <class F, class... Ts>
+struct is_callable_with {
+  template <class U>
+  static auto sfinae(U*)
+  -> decltype((std::declval<U&>())(std::declval<Ts>()...), std::true_type());
+
+  template <class U>
+  static auto sfinae(...) -> std::false_type;
+
+  using type = decltype(sfinae<F>(nullptr));
+  static constexpr bool value = type::value;
+};
+
 /// Checks wheter `F` takes mutable references.
 ///
 /// A manipulator is a functor that manipulates its arguments via
@@ -546,10 +546,23 @@ public:
   static constexpr bool value = false;
 };
 
+template <class T>
+class has_peek_all {
+private:
+  template <class U>
+  static int fun(const U*,
+                 decltype(std::declval<U&>().peek_all(unit))* = nullptr);
+
+  static char fun(const void*);
+
+public:
+  static constexpr bool value = sizeof(fun(static_cast<T*>(nullptr))) > 1;
+};
+
 CAF_HAS_MEMBER_TRAIT(size);
 CAF_HAS_MEMBER_TRAIT(data);
 
-/// Checks whether T is convertible to either `std::function<void (T&)>`
+/// Checks whether F is convertible to either `std::function<void (T&)>`
 /// or `std::function<void (const T&)>`.
 template <class F, class T>
 struct is_handler_for {
@@ -607,7 +620,81 @@ constexpr bool can_insert_elements() {
   return can_insert_elements_impl<T>(static_cast<T*>(nullptr));
 }
 
+/// Checks whether `Tpl` is a specialization of `T` or not.
+template <template <class...> class Tpl, class T>
+struct is_specialization : std::false_type { };
+
+template <template <class...> class T, class... Ts>
+struct is_specialization<T, T<Ts...>> : std::true_type { };
+
+/// Transfers const from `T` to `U`. `U` remains unchanged if `T` is not const.
+template <class T, class U>
+struct transfer_const {
+  using type = U;
+};
+
+template <class T, class U>
+struct transfer_const<const T, U> {
+  using type = const U;
+};
+
+template <class T, class U>
+using transfer_const_t = typename transfer_const<T, U>::type;
+
+/// Checks whether `T` is an `actor` or a `typed_actor<...>`.
+template <class T>
+struct is_actor_handle : std::false_type {};
+
+template <>
+struct is_actor_handle<actor> : std::true_type {};
+
+template <class... Ts>
+struct is_actor_handle<typed_actor<Ts...>> : std::true_type {};
+
+template <class T>
+struct is_stream : std::false_type {};
+
+template <class T>
+struct is_stream<stream<T>> : std::true_type {};
+
+template <class T>
+struct is_result : std::false_type {};
+
+template <class T>
+struct is_result<result<T>> : std::true_type {};
+
+template <class T>
+struct is_expected : std::false_type {};
+
+template <class T>
+struct is_expected<expected<T>> : std::true_type {};
+
+// Checks whether `T` and `U` are integers of the same size and signedness.
+template <class T, class U,
+          bool Enable = std::is_integral<T>::value
+                        && std::is_integral<U>::value
+                        && !std::is_same<T, bool>::value>
+struct is_equal_int_type {
+  static constexpr bool value = sizeof(T) == sizeof(U)
+                                && std::is_signed<T>::value
+                                   == std::is_signed<U>::value;
+};
+
+template <class T, typename U>
+struct is_equal_int_type<T, U, false> : std::false_type { };
+
+/// Compares `T` to `U` und evaluates to `true_type` if either
+/// `T == U or if T and U are both integral types of the
+/// same size and signedness. This works around the issue that
+/// `uint8_t != unsigned char on some compilers.
+template <class T, typename U>
+struct is_same_ish
+    : std::conditional<
+        std::is_same<T, U>::value,
+        std::true_type,
+        is_equal_int_type<T, U>
+      >::type { };
+
 } // namespace detail
 } // namespace caf
 
-#endif // CAF_DETAIL_TYPE_TRAITS_HPP

@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -466,7 +465,7 @@ CAF_TEST(byte_sequence_optimization) {
 CAF_TEST(long_sequences) {
   std::vector<char> data;
   binary_serializer sink{nullptr, data};
-  size_t n = 12345678900u;
+  size_t n = std::numeric_limits<uint32_t>::max();
   sink.begin_sequence(n);
   sink.end_sequence();
   binary_deserializer source{nullptr, data};

@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -19,6 +18,9 @@
 
 #include "caf/detail/private_thread.hpp"
 
+#include "caf/config.hpp"
+#include "caf/detail/set_thread_name.hpp"
+#include "caf/logger.hpp"
 #include "caf/scheduled_actor.hpp"
 
 namespace caf {
@@ -34,7 +36,8 @@ private_thread::private_thread(scheduled_actor* self)
 }
 
 void private_thread::run() {
-  auto job = const_cast<scheduled_actor*>(self_);
+  auto job = self_.load();
+  CAF_ASSERT(job != nullptr);
   CAF_SET_LOGGER_SYS(&job->system());
   CAF_PUSH_AID(job->id());
   CAF_LOG_TRACE("");
@@ -85,11 +88,14 @@ void private_thread::shutdown() {
 }
 
 void private_thread::exec(private_thread* this_ptr) {
+  detail::set_thread_name("caf.actor");
+  this_ptr->system_.thread_started();
   this_ptr->run();
   // make sure to not destroy the private thread object before the
   // detached actor is destroyed and this object is unreachable
   this_ptr->await_self_destroyed();
   // signalize destruction of detached thread to registry
+  this_ptr->system_.thread_terminates();
   this_ptr->system_.dec_detached_threads();
   // done
   delete this_ptr;

@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -19,7 +18,7 @@
 
 #include "caf/config.hpp"
 
-#define CAF_SUITE io_basp
+#define CAF_SUITE io_basp_tcp
 #include "caf/test/dsl.hpp"
 
 #include <array>
@@ -45,7 +44,42 @@ struct anything { };
 anything any_vals;
 
 template <class T>
-using maybe = caf::variant<anything, T>;
+struct maybe {
+  maybe(T x) : val(std::move(x)) {
+    // nop
+  }
+
+  maybe(anything) {
+    // nop
+  }
+
+  caf::optional<T> val;
+};
+
+template <class T>
+std::string to_string(const maybe<T>& x) {
+  return to_string(x.val);
+}
+
+template <class T>
+bool operator==(const maybe<T>& x, const T& y) {
+  return x.val ? x.val == y : true;
+}
+
+template <class T>
+bool operator==(const T& x, const maybe<T>& y) {
+  return y.val ? x == y.val : true;
+}
+
+template <class T>
+bool operator!=(const maybe<T>& x, const T& y) {
+  return !(x == y);
+}
+
+template <class T>
+bool operator!=(const T& x, const maybe<T>& y) {
+  return !(x == y);
+}
 
 constexpr uint8_t no_flags = 0;
 constexpr uint32_t no_payload = 0;
@@ -56,43 +90,6 @@ constexpr auto spawn_serv_atom = caf::atom("SpawnServ");
 constexpr auto config_serv_atom = caf::atom("ConfigServ");
 
 } // namespace <anonymous>
-
-namespace std {
-
-ostream& operator<<(ostream& out, const caf::io::basp::message_type& x) {
-  return out << to_string(x);
-}
-
-template <class T>
-ostream& operator<<(ostream& out, const maybe<T>& x) {
-  using std::to_string;
-  using caf::to_string;
-  using caf::io::basp::to_string;
-  if (caf::get_if<anything>(&x) != nullptr)
-    return out << "*";
-  return out << to_string(get<T>(x));
-}
-
-} // namespace std
-
-namespace caf {
-
-template <class T, class U>
-bool operator==(const maybe<T>& x, const U& y) {
-  return get_if<anything>(&x) != nullptr || get<T>(x) == y;
-}
-
-template <class T, class U>
-bool operator==(const T& x, const maybe<U>& y) {
-  return (y == x);
-}
-
-template <class T>
-std::string to_string(const maybe<T>& x) {
-  return !get_if<anything>(&x) ? std::string{"*"} : deep_to_string(get<T>(x));
-}
-
-} // namespace caf
 
 using namespace std;
 using namespace caf;
@@ -130,7 +127,7 @@ public:
                   .set("middleman.enable-automatic-connections", autoconn)
                   .set("scheduler.policy", autoconn ? caf::atom("testing")
                                                     : caf::atom("stealing"))
-                  .set("middleman.detach-utility-actors", !autoconn)) {
+                  .set("middleman.attach-utility-actors", autoconn)) {
     auto& mm = sys.middleman();
     mpx_ = dynamic_cast<network::test_multiplexer*>(&mm.backend());
     CAF_REQUIRE(mpx_ != nullptr);
@@ -342,7 +339,7 @@ public:
     auto src = actor_cast<strong_actor_ptr>(registry_->get(hdr.source_actor));
     auto dest = registry_->get(hdr.dest_actor);
     CAF_REQUIRE(dest);
-    dest->enqueue(make_mailbox_element(src, message_id::make(),
+    dest->enqueue(make_mailbox_element(src, make_message_id(),
                                        std::move(stages), std::move(msg)),
                   nullptr);
   }
@@ -363,15 +360,15 @@ public:
 
     template <class... Ts>
     mock_t& receive(connection_handle hdl,
-                   maybe<basp::message_type> operation,
-                   maybe<uint8_t> flags,
-                   maybe<uint32_t> payload_len,
-                   maybe<uint64_t> operation_data,
-                   maybe<node_id> source_node,
-                   maybe<node_id> dest_node,
-                   maybe<actor_id> source_actor,
-                   maybe<actor_id> dest_actor,
-                   const Ts&... xs) {
+                    maybe<basp::message_type> operation,
+                    maybe<uint8_t> flags,
+                    maybe<uint32_t> payload_len,
+                    maybe<uint64_t> operation_data,
+                    maybe<node_id> source_node,
+                    maybe<node_id> dest_node,
+                    maybe<actor_id> source_actor,
+                    maybe<actor_id> dest_actor,
+                    const Ts&... xs) {
       CAF_MESSAGE("expect #" << num);
       buffer buf;
       this_->to_payload(buf, xs...);
@@ -398,7 +395,7 @@ public:
         ob.erase(ob.begin(), ob.begin() + basp::header_size);
       }
       CAF_CHECK_EQUAL(operation, hdr.operation);
-      CAF_CHECK_EQUAL(flags, static_cast<size_t>(hdr.flags));
+      CAF_CHECK_EQUAL(flags, static_cast<uint8_t>(hdr.flags));
       CAF_CHECK_EQUAL(payload_len, hdr.payload_len);
       CAF_CHECK_EQUAL(operation_data, hdr.operation_data);
       CAF_CHECK_EQUAL(source_node, hdr.source_node);
@@ -471,7 +468,7 @@ public:
     tmp->send(mma, publish_atom::value, port,
               actor_cast<strong_actor_ptr>(whom), std::move(sigs), "", false);
     expect((atom_value, uint16_t, strong_actor_ptr, sig_t, std::string, bool),
-           from(tmp).to(mma).with(_));
+           from(tmp).to(mma));
     expect((uint16_t), from(mma).to(tmp).with(port));
   }
 };
@@ -482,7 +479,7 @@ CAF_TEST_FIXTURE_SCOPE(basp_tests, fixture)
 
 CAF_TEST(empty_server_handshake) {
   // test whether basp instance correctly sends a
-  // server handshake whene there's no actor published
+  // server handshake when there's no actor published
   buffer buf;
   instance().write_server_handshake(mpx(), buf, none);
   basp::header hdr;
@@ -522,7 +519,7 @@ CAF_TEST(remote_address_and_port) {
   self()->send(mm, get_atom::value, mars().id);
   do {
     mpx()->exec_runnable();
-  } while (!self()->has_next_message());
+  } while (self()->mailbox().empty());
   CAF_MESSAGE("receive result of MM");
   self()->receive(
     [&](const node_id& nid, const std::string& addr, uint16_t port) {
@@ -745,18 +742,18 @@ CAF_TEST(indirect_connections) {
   CAF_MESSAGE("expect ('sys', 'get', \"info\") from Earth to Jupiter at Mars");
   // this asks Jupiter if it has a 'SpawnServ'
   mx.receive(mars().connection,
-            basp::message_type::dispatch_message,
-            basp::header::named_receiver_flag, any_vals,
-            no_operation_data, this_node(), jupiter().id,
-            any_vals, invalid_actor_id,
-            spawn_serv_atom,
-            std::vector<actor_id>{},
-            make_message(sys_atom::value, get_atom::value, "info"));
+             basp::message_type::dispatch_message,
+             basp::header::named_receiver_flag, any_vals,
+             no_operation_data, this_node(), jupiter().id,
+             any_vals, invalid_actor_id,
+             spawn_serv_atom,
+             std::vector<actor_id>{},
+             make_message(sys_atom::value, get_atom::value, "info"));
   CAF_MESSAGE("expect announce_proxy message at Mars from Earth to Jupiter");
   mx.receive(mars().connection,
-            basp::message_type::announce_proxy, no_flags, no_payload,
-            no_operation_data, this_node(), jupiter().id,
-            invalid_actor_id, jupiter().dummy_actor->id());
+             basp::message_type::announce_proxy, no_flags, no_payload,
+             no_operation_data, this_node(), jupiter().id,
+             invalid_actor_id, jupiter().dummy_actor->id());
   CAF_MESSAGE("receive message from jupiter");
   self()->receive(
     [](const std::string& str) -> std::string {
@@ -767,11 +764,11 @@ CAF_TEST(indirect_connections) {
   mpx()->exec_runnable(); // process forwarded message in basp_broker
   mock()
   .receive(mars().connection,
-          basp::message_type::dispatch_message, no_flags, any_vals,
-          no_operation_data, this_node(), jupiter().id,
-          self()->id(), jupiter().dummy_actor->id(),
-          std::vector<actor_id>{},
-          make_message("hello from earth!"));
+           basp::message_type::dispatch_message, no_flags, any_vals,
+           no_operation_data, this_node(), jupiter().id,
+           self()->id(), jupiter().dummy_actor->id(),
+           std::vector<actor_id>{},
+           make_message("hello from earth!"));
 }
 
 CAF_TEST_FIXTURE_SCOPE_END()
@@ -786,6 +783,12 @@ CAF_TEST(automatic_connection) {
   // jupiter [remote hdl 0] -> mars [remote hdl 1] -> earth [this_node]
   // (this node receives a message from jupiter via mars and responds via mars,
   //  but then also establishes a connection to jupiter directly)
+  auto check_node_in_tbl = [&](node& n) {
+    io::id_visitor id_vis;
+    auto hdl = tbl().lookup_direct(n.id);
+    CAF_REQUIRE(hdl);
+    CAF_CHECK_EQUAL(visit(id_vis, *hdl), n.connection.id());
+  };
   mpx()->provide_scribe("jupiter", 8080, jupiter().connection);
   CAF_CHECK(mpx()->has_pending_scribe("jupiter", 8080));
   CAF_MESSAGE("self: " << to_string(self()->address()));
@@ -795,7 +798,8 @@ CAF_TEST(automatic_connection) {
   mpx()->flush_runnables(); // process publish message in basp_broker
   CAF_MESSAGE("connect to mars");
   connect_node(mars(), ax, self()->id());
-  CAF_CHECK_EQUAL(tbl().lookup_direct(mars().id).id(), mars().connection.id());
+  //CAF_CHECK_EQUAL(tbl().lookup_direct(mars().id).id(), mars().connection.id());
+  check_node_in_tbl(mars());
   CAF_MESSAGE("simulate that an actor from jupiter "
               "sends a message to us via mars");
   mock(mars().connection,
@@ -819,7 +823,7 @@ CAF_TEST(automatic_connection) {
           invalid_actor_id,
           config_serv_atom,
           std::vector<actor_id>{},
-          make_message(get_atom::value, "basp.default-connectivity"))
+          make_message(get_atom::value, "basp.default-connectivity-tcp"))
   .receive(mars().connection,
           basp::message_type::announce_proxy, no_flags, no_payload,
           no_operation_data, this_node(), jupiter().id,
@@ -827,7 +831,7 @@ CAF_TEST(automatic_connection) {
   CAF_CHECK_EQUAL(mpx()->output_buffer(mars().connection).size(), 0u);
   CAF_CHECK_EQUAL(tbl().lookup_indirect(jupiter().id), mars().id);
   CAF_CHECK_EQUAL(tbl().lookup_indirect(mars().id), none);
-  auto connection_helper = sys.latest_actor_id();
+  auto connection_helper_actor = sys.latest_actor_id();
   CAF_CHECK_EQUAL(mpx()->output_buffer(mars().connection).size(), 0u);
   // create a dummy config server and respond to the name lookup
   CAF_MESSAGE("receive ConfigServ of jupiter");
@@ -836,9 +840,9 @@ CAF_TEST(automatic_connection) {
   mock(mars().connection,
        {basp::message_type::dispatch_message, 0, 0, 0,
         this_node(), this_node(),
-        invalid_actor_id, connection_helper},
+        invalid_actor_id, connection_helper_actor},
        std::vector<actor_id>{},
-       make_message("basp.default-connectivity",
+       make_message("basp.default-connectivity-tcp",
                     make_message(uint16_t{8080}, std::move(res))));
   // our connection helper should now connect to jupiter and
   // send the scribe handle over to the BASP broker
@@ -861,9 +865,8 @@ CAF_TEST(automatic_connection) {
           invalid_actor_id, invalid_actor_id, std::string{});
   CAF_CHECK_EQUAL(tbl().lookup_indirect(jupiter().id), none);
   CAF_CHECK_EQUAL(tbl().lookup_indirect(mars().id), none);
-  CAF_CHECK_EQUAL(tbl().lookup_direct(jupiter().id).id(),
-                  jupiter().connection.id());
-  CAF_CHECK_EQUAL(tbl().lookup_direct(mars().id).id(), mars().connection.id());
+  check_node_in_tbl(jupiter());
+  check_node_in_tbl(mars());
   CAF_MESSAGE("receive message from jupiter");
   self()->receive(
     [](const std::string& str) -> std::string {

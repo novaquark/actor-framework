@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -24,11 +23,15 @@ CAF_PUSH_WARNINGS
 #include <openssl/ssl.h>
 CAF_POP_WARNINGS
 
-#include "caf/expected.hpp"
-#include "caf/actor_system.hpp"
-#include "caf/scoped_actor.hpp"
+#include <vector>
+#include <mutex>
+
 #include "caf/actor_control_block.hpp"
+#include "caf/actor_system.hpp"
 #include "caf/actor_system_config.hpp"
+#include "caf/expected.hpp"
+#include "caf/raise_error.hpp"
+#include "caf/scoped_actor.hpp"
 
 #include "caf/io/middleman.hpp"
 #include "caf/io/basp_broker.hpp"
@@ -36,11 +39,57 @@ CAF_POP_WARNINGS
 
 #include "caf/openssl/middleman_actor.hpp"
 
+struct CRYPTO_dynlock_value {
+  std::mutex mtx;
+};
+
 namespace caf {
 namespace openssl {
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+static int init_count = 0;
+static std::mutex init_mutex;
+static std::vector<std::mutex> mutexes;
+
+static void locking_function(int mode, int n,
+                             const char* /* file */, int /* line */) {
+  if (mode & CRYPTO_LOCK)
+    mutexes[n].lock();
+  else
+    mutexes[n].unlock();
+}
+
+static CRYPTO_dynlock_value* dynlock_create(const char* /* file */,
+                                            int /* line */) {
+  return new CRYPTO_dynlock_value{};
+}
+
+static void dynlock_lock(int mode, CRYPTO_dynlock_value* dynlock,
+                         const char* /* file */, int /* line */) {
+  if (mode & CRYPTO_LOCK)
+    dynlock->mtx.lock();
+  else
+    dynlock->mtx.unlock();
+}
+
+static void dynlock_destroy(CRYPTO_dynlock_value* dynlock,
+                            const char* /* file */, int /* line */) {
+  delete dynlock;
+}
+#endif
+
 manager::~manager() {
-  // nop
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  std::lock_guard<std::mutex> lock{init_mutex};
+  --init_count;
+  if (init_count == 0) {
+    CRYPTO_set_locking_callback(nullptr);
+    CRYPTO_set_dynlock_create_callback(nullptr);
+    CRYPTO_set_dynlock_lock_callback(nullptr);
+    CRYPTO_set_dynlock_destroy_callback(nullptr);
+    mutexes = std::vector<std::mutex>(0);
+  }
+#endif
 }
 
 void manager::start() {
@@ -53,7 +102,7 @@ void manager::stop() {
   CAF_LOG_TRACE("");
   scoped_actor self{system(), true};
   self->send_exit(manager_, exit_reason::kill);
-  if (system().config().middleman_detach_utility_actors)
+  if (!get_or(config(), "middleman.attach-utility-actors", false))
     self->wait_for(manager_);
   manager_ = nullptr;
 }
@@ -70,6 +119,19 @@ void manager::init(actor_system_config&) {
     if (system().config().openssl_key.size() == 0)
       CAF_RAISE_ERROR("No private key configured for SSL endpoint");
   }
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  std::lock_guard<std::mutex> lock{init_mutex};
+  ++init_count;
+  if (init_count == 1) {
+    mutexes = std::vector<std::mutex>(CRYPTO_num_locks());
+    CRYPTO_set_locking_callback(locking_function);
+    CRYPTO_set_dynlock_create_callback(dynlock_create);
+    CRYPTO_set_dynlock_lock_callback(dynlock_lock);
+    CRYPTO_set_dynlock_destroy_callback(dynlock_destroy);
+    // OpenSSL's default thread ID callback should work, so don't set our own.
+  }
+#endif
 }
 
 actor_system::module::id_t manager::id() const {

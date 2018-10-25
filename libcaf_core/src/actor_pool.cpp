@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -123,12 +122,25 @@ void actor_pool::enqueue(mailbox_element_ptr what, execution_unit* eu) {
   policy_(home_system(), guard, workers_, what, eu);
 }
 
-actor_pool::actor_pool(actor_config& cfg) : monitorable_actor(cfg) {
+actor_pool::actor_pool(actor_config& cfg)
+    : monitorable_actor(cfg),
+      planned_reason_(exit_reason::normal) {
   register_at_system();
 }
 
-void actor_pool::on_cleanup() {
-  // nop
+void actor_pool::on_destroy() {
+  CAF_PUSH_AID_FROM_PTR(this);
+  if (!getf(is_cleaned_up_flag)) {
+    cleanup(exit_reason::unreachable, nullptr);
+    monitorable_actor::on_destroy();
+    unregister_from_system();
+  }
+}
+
+void actor_pool::on_cleanup(const error& reason) {
+  CAF_PUSH_AID_FROM_PTR(this);
+  CAF_IGNORE_UNUSED(reason);
+  CAF_LOG_TERMINATE_EVENT(this, reason);
 }
 
 bool actor_pool::filter(upgrade_lock<detail::shared_spinlock>& guard,

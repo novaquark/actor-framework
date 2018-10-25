@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,21 +16,15 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_SERIALIZER_HPP
-#define CAF_SERIALIZER_HPP
+#pragma once
 
 #include <string>
 #include <cstddef> // size_t
 #include <type_traits>
 
-#include "caf/config.hpp"
-
-#ifndef CAF_NO_EXCEPTIONS
-#include <exception>
-#endif // CAF_NO_EXCEPTIONS
-
-#include "caf/fwd.hpp"
 #include "caf/data_processor.hpp"
+#include "caf/fwd.hpp"
+#include "caf/raise_error.hpp"
 
 namespace caf {
 
@@ -55,8 +48,6 @@ public:
   ~serializer() override;
 };
 
-#ifndef CAF_NO_EXCEPTIONS
-
 template <class T>
 typename std::enable_if<
   std::is_same<
@@ -68,7 +59,7 @@ operator&(serializer& sink, const T& x) {
   // implementations are required to never modify `x` while saving
   auto e = sink.apply(const_cast<T&>(x));
   if (e)
-    throw std::runtime_error(to_string(e));
+    CAF_RAISE_ERROR("error during serialization (using operator&)");
 }
 
 template <class T>
@@ -84,8 +75,5 @@ operator<<(serializer& sink, const T& x) {
   return sink;
 }
 
-#endif // CAF_NO_EXCEPTIONS
-
 } // namespace caf
 
-#endif // CAF_SERIALIZER_HPP

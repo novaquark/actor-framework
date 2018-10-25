@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -20,9 +19,16 @@
 #include "caf/config.hpp"
 
 #define CAF_SUITE openssl_authentication
-#include "caf/test/unit_test.hpp"
+#include "caf/test/dsl.hpp"
 
-#include <unistd.h>
+#ifndef CAF_WINDOWS
+# include <unistd.h>
+#else
+# include <io.h>
+# include <windows.h>
+# define F_OK 0
+# define PATH_MAX MAX_PATH
+#endif
 
 #include <vector>
 #include <sstream>
@@ -49,9 +55,9 @@ public:
     load<openssl::manager>();
     add_message_type<std::vector<int>>("std::vector<int>");
     actor_system_config::parse(test::engine::argc(), test::engine::argv());
-    middleman_detach_multiplexer = false;
-    middleman_detach_utility_actors = false;
-    scheduler_policy = atom("testing");
+    set("middleman.manual-multiplexing", true);
+    set("middleman.attach-utility-actors", true);
+    set("scheduler.policy", atom("testing"));
   }
 
   static std::string data_dir() {
@@ -60,10 +66,14 @@ public:
      // TODO: https://github.com/actor-framework/actor-framework/issues/555
      path += "/../../libcaf_openssl/test";
      char rpath[PATH_MAX];
+#ifndef CAF_WINDOWS
      auto rp = realpath(path.c_str(), rpath);
+#else
+     auto rp = GetFullPathName(path.c_str(), PATH_MAX, rpath, nullptr);
+#endif
      std::string result;
      if (rp)
-       result = rp;
+       result = rpath;
      return result;
   }
 };
@@ -196,12 +206,12 @@ CAF_TEST(authentication_success) {
   exec_loop();
   CAF_MESSAGE("publish pong");
   loop_after_next_enqueue(server_side);
-  CAF_EXP_THROW(port, publish(spong, 0, local_host));
+  auto port = unbox(publish(spong, 0, local_host));
   exec_loop();
   // client side
   CAF_MESSAGE("connect to pong via port " << port);
   loop_after_next_enqueue(client_side);
-  CAF_EXP_THROW(pong, remote_actor(client_side, local_host, port));
+  auto pong = unbox(remote_actor(client_side, local_host, port));
   CAF_MESSAGE("spawn ping and exchange messages");
   auto sping = client_side.spawn(make_ping_behavior, pong);
   while (!terminated(sping))
@@ -220,7 +230,7 @@ CAF_TEST(authentication_failure) {
   exec_loop();
   loop_after_next_enqueue(server_side);
   CAF_MESSAGE("publish pong");
-  CAF_EXP_THROW(port, publish(spong, 0, local_host));
+  auto port = unbox(publish(spong, 0, local_host));
   exec_loop();
   // client side
   CAF_MESSAGE("connect to pong via port " << port);

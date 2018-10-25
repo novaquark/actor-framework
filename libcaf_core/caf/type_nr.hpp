@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TYPE_NR_HPP
-#define CAF_TYPE_NR_HPP
+#pragma once
 
 #include <map>
 #include <set>
@@ -26,8 +24,9 @@
 #include <vector>
 #include <cstdint>
 
-#include "caf/fwd.hpp"
 #include "caf/atom.hpp"
+#include "caf/fwd.hpp"
+#include "caf/timespan.hpp"
 #include "caf/timestamp.hpp"
 
 #include "caf/detail/type_list.hpp"
@@ -46,8 +45,8 @@ using sorted_builtin_types =
     atom_value,                         // @atom
     std::vector<char>,                  // @charbuf
     down_msg,                           // @down
+    downstream_msg,                     // @downstream_msg
     duration,                           // @duration
-    timestamp,                          // @timestamp
     error,                              // @error
     exit_msg,                           // @exit
     group,                              // @group
@@ -60,13 +59,15 @@ using sorted_builtin_types =
     message,                            // @message
     message_id,                         // @message_id
     node_id,                            // @node
+    open_stream_msg,                    // @open_stream_msg
     std::string,                        // @str
-    stream_msg,                         // @stream_msg
     std::map<std::string, std::string>, // @strmap
     strong_actor_ptr,                   // @strong_actor_ptr
     std::set<std::string>,              // @strset
     std::vector<std::string>,           // @strvec
     timeout_msg,                        // @timeout
+    timespan,                           // @timespan
+    timestamp,                          // @timestamp
     uint16_t,                           // @u16
     std::u16string,                     // @u16_str
     uint32_t,                           // @u32
@@ -74,6 +75,7 @@ using sorted_builtin_types =
     uint64_t,                           // @u64
     uint8_t,                            // @u8
     unit_t,                             // @unit
+    upstream_msg,                       // @upstream_msg
     weak_actor_ptr,                     // @weak_actor_ptr
     bool,                               // bool
     double,                             // double
@@ -150,4 +152,3 @@ constexpr uint32_t make_type_token_from_list() {
 
 } // namespace caf
 
-#endif // CAF_TYPE_NR_HPP

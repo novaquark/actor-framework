@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TYPE_ERASED_TUPLE_HPP
-#define CAF_TYPE_ERASED_TUPLE_HPP
+#pragma once
 
 #include <tuple>
 #include <cstddef>
@@ -47,6 +45,7 @@ public:
 
   type_erased_tuple() = default;
   type_erased_tuple(const type_erased_tuple&) = default;
+  type_erased_tuple& operator=(const type_erased_tuple&) = default;
 
   virtual ~type_erased_tuple();
 
@@ -61,7 +60,7 @@ public:
   // -- modifiers --------------------------------------------------------------
 
   /// Load the content for the tuple from `source`.
-  error load(deserializer& source);
+  virtual error load(deserializer& source);
 
   // -- pure virtual observers -------------------------------------------------
 
@@ -100,11 +99,12 @@ public:
   std::string stringify() const;
 
   /// Saves the content of the tuple to `sink`.
-  error save(serializer& sink) const;
+  virtual error save(serializer& sink) const;
 
   /// Checks whether the type of the stored value at position `pos`
   /// matches type number `n` and run-time type information `p`.
-  bool matches(size_t pos, uint16_t nr, const std::type_info* ptr) const  noexcept;
+  bool matches(size_t pos, uint16_t nr,
+               const std::type_info* ptr) const  noexcept;
 
   // -- convenience functions --------------------------------------------------
 
@@ -176,9 +176,8 @@ public:
   /// Returns `true` if the pattern `Ts...` matches the content of this tuple.
   template <class... Ts>
   bool match_elements() const noexcept {
-    detail::meta_elements<detail::type_list<Ts...>> xs;
-    return xs.arr.empty() ? empty()
-                          : detail::try_match(*this, &xs.arr[0], sizeof...(Ts));
+    detail::type_list<Ts...> tk;
+    return match_elements(tk);
   }
 
   template <class F>
@@ -188,6 +187,18 @@ public:
     detail::type_list<typename trait::result_type> result_token;
     typename trait::arg_types args_token;
     return apply(fun, result_token, args_token);
+  }
+
+  /// @private
+  template <class T, class... Ts>
+  bool match_elements(detail::type_list<T, Ts...>) const noexcept {
+    detail::meta_elements<detail::type_list<T, Ts...>> xs;
+    return detail::try_match(*this, &xs.arr[0], 1 + sizeof...(Ts));
+  }
+
+  /// @private
+  inline bool match_elements(detail::type_list<>) const noexcept {
+    return empty();
   }
 
 private:
@@ -259,4 +270,3 @@ public:
 
 } // namespace caf
 
-#endif // CAF_TYPE_ERASED_TUPLE_HPP

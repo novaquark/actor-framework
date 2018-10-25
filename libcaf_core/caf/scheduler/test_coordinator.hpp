@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,10 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TEST_COORDINATOR_HPP
-#define CAF_TEST_COORDINATOR_HPP
-
-#include "caf/config.hpp"
+#pragma once
 
 #include <deque>
 #include <chrono>
@@ -28,6 +24,9 @@
 #include <cstddef>
 #include <algorithm>
 
+#include "caf/config.hpp"
+#include "caf/detail/test_actor_clock.hpp"
+#include "caf/raise_error.hpp"
 #include "caf/scheduled_actor.hpp"
 #include "caf/scheduler/abstract_coordinator.hpp"
 
@@ -39,24 +38,13 @@ class test_coordinator : public abstract_coordinator {
 public:
   using super = abstract_coordinator;
 
+  /// A type-erased boolean predicate.
+  using bool_predicate = std::function<bool()>;
+
   test_coordinator(actor_system& sys);
 
   /// A double-ended queue representing our current job queue.
   std::deque<resumable*> jobs;
-
-  /// A scheduled message or timeout.
-  struct delayed_msg {
-    strong_actor_ptr from;
-    strong_actor_ptr to;
-    message_id mid;
-    message msg;
-  };
-
-  /// A clock type using the highest available precision.
-  using hrc = std::chrono::high_resolution_clock;
-
-  /// A map type for storing scheduled messages and timeouts.
-  std::multimap<hrc::time_point, delayed_msg> delayed_messages;
 
   /// Returns whether at least one job is in the queue.
   inline bool has_job() const {
@@ -117,16 +105,25 @@ public:
   /// left. Returns the number of processed events.
   size_t run(size_t max_count = std::numeric_limits<size_t>::max());
 
-  /// Tries to dispatch a single delayed message.
-  bool dispatch_once();
+  /// Returns whether at least one pending timeout exists.
+  bool has_pending_timeout() const {
+    return clock_.has_pending_timeout();
+  }
 
-  /// Dispatches all pending delayed messages. Returns the number of dispatched
-  /// messages.
-  size_t dispatch();
+  /// Tries to trigger a single timeout.
+  bool trigger_timeout() {
+    return clock_.trigger_timeout();
+  }
 
-  /// Loops until no job or delayed message remains. Returns the total number of
-  /// events (first) and dispatched delayed messages (second).
-  std::pair<size_t, size_t> run_dispatch_loop();
+  /// Triggers all pending timeouts.
+  size_t trigger_timeouts() {
+    return clock_.trigger_timeouts();
+  }
+
+  /// Advances simulation time and returns the number of triggered timeouts.
+  size_t advance_time(timespan x) {
+    return clock_.advance_time(x);
+  }
 
   template <class F>
   void after_next_enqueue(F f) {
@@ -141,6 +138,14 @@ public:
   /// hook.
   void inline_all_enqueues();
 
+  bool detaches_utility_actors() const override;
+
+  detail::test_actor_clock& clock() noexcept override;
+
+  std::pair<size_t, size_t>
+  run_dispatch_loop(timespan cycle_duration = timespan{1})
+    CAF_DEPRECATED_MSG("use the testing DSL's run() instead");
+
 protected:
   void start() override;
 
@@ -151,12 +156,12 @@ protected:
 private:
   void inline_all_enqueues_helper();
 
+  /// Allows users to fake time at will.
+  detail::test_actor_clock clock_;
+
   /// User-provided callback for triggering custom code in `enqueue`.
   std::function<void()> after_next_enqueue_;
 };
 
 } // namespace scheduler
 } // namespace caf
-
-#endif // CAF_TEST_COORDINATOR_HPP
-

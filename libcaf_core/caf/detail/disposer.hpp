@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_DETAIL_DISPOSER_HPP
-#define CAF_DETAIL_DISPOSER_HPP
+#pragma once
 
 #include <type_traits>
 
@@ -29,13 +27,13 @@ namespace detail {
 
 class disposer {
 public:
-  inline void operator()(memory_managed* ptr) const {
+  inline void operator()(memory_managed* ptr) const noexcept {
     ptr->request_deletion(false);
   }
 
   template <class T>
   typename std::enable_if<!std::is_base_of<memory_managed, T>::value>::type
-  operator()(T* ptr) const {
+  operator()(T* ptr) const noexcept {
     delete ptr;
   }
 };
@@ -43,5 +41,4 @@ public:
 } // namespace detail
 } // namespace caf
 
-#endif // CAF_DETAIL_DISPOSER_HPP
 

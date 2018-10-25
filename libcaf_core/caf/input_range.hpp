@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_INPUT_RANGE_HPP
-#define CAF_INPUT_RANGE_HPP
+#pragma once
 
 #include <iterator>
 
@@ -42,6 +40,8 @@ public:
     iterator(input_range* range) : xs_(range) {
       if (xs_)
         advance();
+      else
+        x_ = nullptr;
     }
 
     iterator(const iterator&) = default;
@@ -114,9 +114,7 @@ private:
   I last_;
 };
 
-/**
- * @relates input_range
- */
+/// @relates input_range
 template <class I>
 input_range_impl<I> make_input_range(I first, I last) {
   return {first, last};
@@ -124,4 +122,3 @@ input_range_impl<I> make_input_range(I first, I last) {
 
 } // namespace caf
 
-#endif // CAF_INPUT_RANGE_HPP

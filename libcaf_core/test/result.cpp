@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -27,6 +26,23 @@
 
 using namespace std;
 using namespace caf;
+
+namespace {
+
+template<class T>
+void test_unit_void() {
+  auto x = result<T>{};
+  CAF_CHECK_EQUAL(x.flag, rt_value);
+  x = skip();
+  CAF_CHECK_EQUAL(x.flag, rt_skip);
+  x = expected<T>{};
+  CAF_CHECK_EQUAL(x.flag, rt_value);
+  x = expected<T>{sec::unexpected_message};
+  CAF_CHECK_EQUAL(x.flag, rt_error);
+  CAF_CHECK_EQUAL(x.err, make_error(sec::unexpected_message));
+}
+
+} // namespace anonymous
 
 CAF_TEST(skip) {
   auto x = result<>{skip()};
@@ -51,13 +67,9 @@ CAF_TEST(expected) {
 }
 
 CAF_TEST(void_specialization) {
-  auto x = result<void>{};
-  CAF_CHECK_EQUAL(x.flag, rt_value);
-  x = skip();
-  CAF_CHECK_EQUAL(x.flag, rt_skip);
-  x = expected<void>{};
-  CAF_CHECK_EQUAL(x.flag, rt_value);
-  x = expected<void>{sec::unexpected_message};
-  CAF_CHECK_EQUAL(x.flag, rt_error);
-  CAF_CHECK_EQUAL(x.err, make_error(sec::unexpected_message));
+  test_unit_void<void>();
+}
+
+CAF_TEST(unit_specialization) {
+  test_unit_void<unit_t>();
 }

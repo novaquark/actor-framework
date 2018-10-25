@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -38,7 +37,7 @@ ref_counted& ref_counted::operator=(const ref_counted&) {
   return *this;
 }
 
-void ref_counted::deref() noexcept {
+void ref_counted::deref() const noexcept {
   if (unique()) {
     request_deletion(false);
     return;

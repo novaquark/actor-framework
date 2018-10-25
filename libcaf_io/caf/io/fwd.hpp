@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_IO_FWD_HPP
-#define CAF_IO_FWD_HPP
+#pragma once
 
 namespace caf {
 
@@ -42,21 +40,23 @@ class middleman;
 class basp_broker;
 class receive_policy;
 class abstract_broker;
+class datagram_servant;
 
 // -- aliases ------------------------------------------------------------------
 
 using scribe_ptr = intrusive_ptr<scribe>;
 using doorman_ptr = intrusive_ptr<doorman>;
+using datagram_servant_ptr = intrusive_ptr<datagram_servant>;
 
 // -- nested namespaces --------------------------------------------------------
 
 namespace network {
 
 class multiplexer;
+class default_multiplexer;
 
 } // namespace network
 
 } // namespace io
 } // namespace caf
 
-#endif // CAF_IO_FWD_HPP

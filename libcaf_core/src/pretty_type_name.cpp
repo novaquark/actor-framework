@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -35,7 +34,7 @@ namespace detail {
 void prettify_type_name(std::string& class_name) {
   //replace_all(class_name, " ", "");
   replace_all(class_name, "::", ".");
-  replace_all(class_name, "(anonymousnamespace)", "ANON");
+  replace_all(class_name, "(anonymous namespace)", "ANON");
   replace_all(class_name, ".__1.", "."); // gets rid of weird Clang-lib names
   // hide CAF magic in logs
   auto strip_magic = [&](const char* prefix_begin, const char* prefix_end) {
@@ -50,7 +49,11 @@ void prettify_type_name(std::string& class_name) {
   };
   char prefix1[] = "caf.detail.embedded<";
   strip_magic(prefix1, prefix1 + (sizeof(prefix1) - 1));
-  // finally, replace any whitespace with %20
+  // Drop template parameters, only leaving the template class name.
+  auto i = std::find(class_name.begin(), class_name.end(), '<');
+  if (i != class_name.end())
+    class_name.erase(i, class_name.end());
+  // Finally, replace any whitespace with %20 (should never happen).
   replace_all(class_name, " ", "%20");
 }
 

@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_STREAM_SERIALIZER_HPP
-#define CAF_STREAM_SERIALIZER_HPP
+#pragma once
 
 #include <string>
 #include <limits>
@@ -30,6 +28,7 @@
 #include <type_traits>
 
 #include "caf/sec.hpp"
+#include "caf/config.hpp"
 #include "caf/streambuf.hpp"
 #include "caf/serializer.hpp"
 
@@ -85,7 +84,12 @@ public:
   }
 
   error begin_sequence(size_t& list_size) override {
-    return varbyte_encode(list_size);
+    // TODO: protect with `if constexpr (sizeof(size_t) > sizeof(uint32_t))`
+    //       when switching to C++17
+    CAF_ASSERT(list_size <= std::numeric_limits<uint32_t>::max());
+    // Serialize a `size_t` always in 32-bit, to guarantee compatibility with
+    // 32-bit nodes in the network.
+    return varbyte_encode(static_cast<uint32_t>(list_size));
   }
 
   error end_sequence() override {
@@ -189,4 +193,3 @@ private:
 
 } // namespace caf
 
-#endif // CAF_STREAM_SERIALIZER_HPP

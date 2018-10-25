@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_EVENT_BASED_ACTOR_HPP
-#define CAF_EVENT_BASED_ACTOR_HPP
+#pragma once
 
 #include <type_traits>
 
@@ -46,9 +44,8 @@ public:
 
 /// A cooperatively scheduled, event-based actor implementation. This is the
 /// recommended base class for user-defined actors.
-/// @extends local_actor
-class event_based_actor : public extend<scheduled_actor,
-                                        event_based_actor>::
+/// @extends scheduled_actor
+class event_based_actor : public extend<scheduled_actor, event_based_actor>::
                                  with<mixin::sender,
                                       mixin::requester,
                                       mixin::subscriber,
@@ -82,4 +79,3 @@ protected:
 
 } // namespace caf
 
-#endif // CAF_EVENT_BASED_ACTOR_HPP

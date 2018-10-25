@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_MESSAGE_VIEW_HPP
-#define CAF_MESSAGE_VIEW_HPP
+#pragma once
 
 #include "caf/fwd.hpp"
 
@@ -32,6 +30,8 @@ public:
 
   virtual type_erased_tuple& content() = 0;
 
+  virtual const type_erased_tuple& content() const = 0;
+
   virtual message move_content_to_message() = 0;
 
   virtual message copy_content_to_message() const = 0;
@@ -39,4 +39,3 @@ public:
 
 } // namespace caf
 
-#endif // CAF_MESSAGE_VIEW_HPP

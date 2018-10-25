@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_SEND_HPP
-#define CAF_SEND_HPP
+#pragma once
 
 #include "caf/actor.hpp"
 #include "caf/message.hpp"
@@ -64,15 +62,17 @@ void send_as(const Source& src, const Dest& dest, Ts&&... xs) {
                     >::valid,
                 "this actor does not accept the response message");
   if (dest)
-    dest->eq_impl(message_id::make(P), actor_cast<strong_actor_ptr>(src),
+    dest->eq_impl(make_message_id(P), actor_cast<strong_actor_ptr>(src),
                   nullptr, std::forward<Ts>(xs)...);
 }
 
-template <class Source, class Dest, class... Ts>
+template <message_priority P = message_priority::normal, class Source,
+          class Dest, class... Ts>
 void unsafe_send_as(Source* src, const Dest& dest, Ts&&... xs) {
-  actor_cast<abstract_actor*>(dest)->eq_impl(message_id::make(), src->ctrl(),
-                                             src->context(),
-                                             std::forward<Ts>(xs)...);
+  if (dest)
+    actor_cast<abstract_actor*>(dest)->eq_impl(make_message_id(P),
+                                               src->ctrl(), src->context(),
+                                               std::forward<Ts>(xs)...);
 }
 
 template <class... Ts>
@@ -104,7 +104,7 @@ void anon_send(const Dest& dest, Ts&&... xs) {
   static_assert(response_type_unbox<signatures_of_t<Dest>, token>::valid,
                 "receiver does not accept given message");
   if (dest)
-    dest->eq_impl(message_id::make(P), nullptr, nullptr,
+    dest->eq_impl(make_message_id(P), nullptr, nullptr,
                   std::forward<Ts>(xs)...);
 }
 
@@ -113,7 +113,7 @@ template <class Dest>
 void anon_send_exit(const Dest& dest, exit_reason reason) {
   CAF_LOG_TRACE(CAF_ARG(dest) << CAF_ARG(reason));
   if (dest)
-    dest->enqueue(nullptr, message_id::make(),
+    dest->enqueue(nullptr, make_message_id(),
                   make_message(exit_msg{dest->address(), reason}), nullptr);
 }
 
@@ -133,4 +133,3 @@ inline void anon_send_exit(const weak_actor_ptr& to, exit_reason reason) {
 
 } // namespace caf
 
-#endif // CAF_SEND_HPP

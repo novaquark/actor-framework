@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_IO_REMOTE_ACTOR_HPP
-#define CAF_IO_REMOTE_ACTOR_HPP
+#pragma once
 
 #include <set>
 #include <string>
@@ -39,12 +37,9 @@ namespace io {
 template <class ActorHandle = actor>
 expected<ActorHandle> remote_actor(actor_system& sys, std::string host,
                                    uint16_t port) {
-  detail::type_list<ActorHandle> tk;
-  return sys.middleman().remote_actor(sys, sys.message_types(tk),
-                                      std::move(host), port);
+  return sys.middleman().remote_actor<ActorHandle>(std::move(host), port);
 }
 
 } // namespace io
 } // namespace caf
 
-#endif // CAF_IO_REMOTE_ACTOR_HPP

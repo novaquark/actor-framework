@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_TIMEOUT_DEFINITION_HPP
-#define CAF_TIMEOUT_DEFINITION_HPP
+#pragma once
 
 #include <functional>
 #include <type_traits>
@@ -73,4 +71,3 @@ using generic_timeout_definition = timeout_definition<std::function<void()>>;
 
 } // namespace caf
 
-#endif // CAF_TIMEOUT_DEFINITION_HPP

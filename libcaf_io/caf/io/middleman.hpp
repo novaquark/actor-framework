@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_IO_MIDDLEMAN_HPP
-#define CAF_IO_MIDDLEMAN_HPP
+#pragma once
 
 #include <map>
 #include <vector>
@@ -45,7 +43,7 @@ namespace io {
 /// Manages brokers and network backends.
 class middleman : public actor_system::module {
 public:
-  friend class actor_system;
+  friend class ::caf::actor_system;
 
   using hook_vector = std::vector<hook_uptr>;
 
@@ -79,6 +77,22 @@ public:
                    system().message_types(tk), port, in, reuse);
   }
 
+  /// Tries to publish `whom` at `port` and returns either an
+  /// `error` or the bound port.
+  /// @param whom Actor that should be published at `port`.
+  /// @param port Unused TCP port.
+  /// @param in The IP address to listen to or `INADDR_ANY` if `in == nullptr`.
+  /// @param reuse Create socket using `SO_REUSEADDR`.
+  /// @returns The actual port the OS uses after `bind()`. If `port == 0`
+  ///          the OS chooses a random high-level port.
+  template <class Handle>
+  expected<uint16_t> publish_udp(Handle&& whom, uint16_t port,
+                                 const char* in = nullptr, bool reuse = false) {
+    detail::type_list<typename std::decay<Handle>::type> tk;
+    return publish_udp(actor_cast<strong_actor_ptr>(std::forward<Handle>(whom)),
+                       system().message_types(tk), port, in, reuse);
+  }
+
   /// Makes *all* local groups accessible via network
   /// on address `addr` and `port`.
   /// @returns The actual port the OS uses after `bind()`. If `port == 0`
@@ -93,6 +107,14 @@ public:
   template <class Handle>
   expected<void> unpublish(const Handle& whom, uint16_t port = 0) {
     return unpublish(whom.address(), port);
+  }
+
+  /// Unpublishes `whom` by closing `port` or all assigned ports if `port == 0`.
+  /// @param whom Actor that should be unpublished at `port`.
+  /// @param port UDP port.
+  template <class Handle>
+  expected<void> unpublish_udp(const Handle& whom, uint16_t port = 0) {
+    return unpublish_udp(whom.address(), port);
   }
 
   /// Establish a new connection to the actor at `host` on given `port`.
@@ -110,6 +132,21 @@ public:
     return actor_cast<ActorHandle>(std::move(*x));
   }
 
+  /// Contacts the actor at `host` on given `port`.
+  /// @param host Valid hostname or IP address.
+  /// @param port TCP port.
+  /// @returns An `actor` to the proxy instance representing
+  ///          a remote actor or an `error`.
+  template <class ActorHandle = actor>
+  expected<ActorHandle> remote_actor_udp(std::string host, uint16_t port) {
+    detail::type_list<ActorHandle> tk;
+    auto x = remote_actor_udp(system().message_types(tk), std::move(host), port);
+    if (!x)
+      return x.error();
+    CAF_ASSERT(x && *x);
+    return actor_cast<ActorHandle>(std::move(*x));
+  }
+
   /// <group-name>@<host>:<port>
   expected<group> remote_group(const std::string& group_uri);
 
@@ -119,6 +156,11 @@ public:
   /// Returns the enclosing actor system.
   inline actor_system& system() {
     return system_;
+  }
+
+  /// Returns the systemw-wide configuration.
+  inline const actor_system_config& config() const {
+    return system_.config();
   }
 
   /// Returns a handle to the actor managing the middleman singleton.
@@ -329,11 +371,19 @@ private:
                              std::set<std::string> sigs,
                              uint16_t port, const char* cstr, bool ru);
 
+  expected<uint16_t> publish_udp(const strong_actor_ptr& whom,
+                                 std::set<std::string> sigs,
+                                 uint16_t port, const char* cstr, bool ru);
 
   expected<void> unpublish(const actor_addr& whom, uint16_t port);
 
+  expected<void> unpublish_udp(const actor_addr& whom, uint16_t port);
+
   expected<strong_actor_ptr> remote_actor(std::set<std::string> ifs,
                                           std::string host, uint16_t port);
+
+  expected<strong_actor_ptr> remote_actor_udp(std::set<std::string> ifs,
+                                              std::string host, uint16_t port);
 
   static int exec_slave_mode(actor_system&, const actor_system_config&);
 
@@ -354,4 +404,3 @@ private:
 } // namespace io
 } // namespace caf
 
-#endif // CAF_IO_MIDDLEMAN_HPP

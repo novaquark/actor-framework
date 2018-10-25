@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -198,15 +197,23 @@ bool session::try_accept(native_socket fd) {
   return handle_ssl_result(ret);
 }
 
+bool session::must_read_more(native_socket, size_t threshold) {
+  return static_cast<size_t>(SSL_pending(ssl_)) >= threshold;
+}
+
 const char* session::openssl_passphrase() {
   return openssl_passphrase_.c_str();
 }
 
 SSL_CTX* session::create_ssl_context() {
   CAF_BLOCK_SIGPIPE();
+#ifdef CAF_SSL_HAS_NON_VERSIONED_TLS_FUN
+  auto ctx = SSL_CTX_new(TLS_method());
+#else
   auto ctx = SSL_CTX_new(TLSv1_2_method());
+#endif
   if (!ctx)
-    raise_ssl_error("cannot create OpenSSL context");
+    CAF_RAISE_ERROR("cannot create OpenSSL context");
   if (sys_.openssl_manager().authentication_enabled()) {
     // Require valid certificates on both sides.
     auto& cfg = sys_.config();
@@ -214,7 +221,7 @@ SSL_CTX* session::create_ssl_context() {
         && SSL_CTX_use_certificate_chain_file(ctx,
                                               cfg.openssl_certificate.c_str())
              != 1)
-      raise_ssl_error("cannot load certificate");
+      CAF_RAISE_ERROR("cannot load certificate");
     if (cfg.openssl_passphrase.size() > 0) {
       openssl_passphrase_ = cfg.openssl_passphrase;
       SSL_CTX_set_default_passwd_cb(ctx, pem_passwd_cb);
@@ -224,30 +231,40 @@ SSL_CTX* session::create_ssl_context() {
         && SSL_CTX_use_PrivateKey_file(ctx, cfg.openssl_key.c_str(),
                                        SSL_FILETYPE_PEM)
              != 1)
-      raise_ssl_error("cannot load private key");
+      CAF_RAISE_ERROR("cannot load private key");
     auto cafile =
       (cfg.openssl_cafile.size() > 0 ? cfg.openssl_cafile.c_str() : nullptr);
     auto capath =
       (cfg.openssl_capath.size() > 0 ? cfg.openssl_capath.c_str() : nullptr);
     if (cafile || capath) {
       if (SSL_CTX_load_verify_locations(ctx, cafile, capath) != 1)
-        raise_ssl_error("cannot load trusted CA certificates");
+        CAF_RAISE_ERROR("cannot load trusted CA certificates");
     }
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
                        nullptr);
     if (SSL_CTX_set_cipher_list(ctx, "HIGH:!aNULL:!MD5") != 1)
-      raise_ssl_error("cannot set cipher list");
+      CAF_RAISE_ERROR("cannot set cipher list");
   } else {
     // No authentication.
     SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
+#if defined(CAF_SSL_HAS_ECDH_AUTO) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
+    SSL_CTX_set_ecdh_auto(ctx, 1);
+#else
     auto ecdh = EC_KEY_new_by_curve_name(NID_secp384r1);
     if (!ecdh)
-      raise_ssl_error("cannot get ECDH curve");
+      CAF_RAISE_ERROR("cannot get ECDH curve");
     CAF_PUSH_WARNINGS
     SSL_CTX_set_tmp_ecdh(ctx, ecdh);
+    EC_KEY_free(ecdh);
     CAF_POP_WARNINGS
-    if (SSL_CTX_set_cipher_list(ctx, "AECDH-AES256-SHA") != 1)
-      raise_ssl_error("cannot set anonymous cipher");
+#endif
+#ifdef CAF_SSL_HAS_SECURITY_LEVEL
+    const char* cipher = "AECDH-AES256-SHA@SECLEVEL=0";
+#else
+    const char* cipher = "AECDH-AES256-SHA";
+#endif
+    if (SSL_CTX_set_cipher_list(ctx, cipher) != 1)
+      CAF_RAISE_ERROR("cannot set anonymous cipher");
   }
   return ctx;
 }
@@ -262,10 +279,6 @@ std::string session::get_ssl_error() {
     msg += buf;
   }
   return msg;
-}
-
-void session::raise_ssl_error(std::string msg) {
-  CAF_RAISE_ERROR(std::string("[OpenSSL] ") + msg + ": " + get_ssl_error());
 }
 
 bool session::handle_ssl_result(int ret) {

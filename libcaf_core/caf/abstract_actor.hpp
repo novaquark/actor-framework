@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_ABSTRACT_ACTOR_HPP
-#define CAF_ABSTRACT_ACTOR_HPP
+#pragma once
 
 #include <set>
 #include <mutex>
@@ -122,18 +120,18 @@ public:
             ctx);
   }
 
-  // flags storing runtime information                     used by ...
-  static constexpr int has_timeout_flag       = 0x0004; // single_timeout
-  static constexpr int is_registered_flag     = 0x0008; // (several actors)
-  static constexpr int is_initialized_flag    = 0x0010; // event-based actors
-  static constexpr int is_blocking_flag       = 0x0020; // blocking_actor
-  static constexpr int is_detached_flag       = 0x0040; // local_actor
-  static constexpr int is_priority_aware_flag = 0x0080; // local_actor
-  static constexpr int is_serializable_flag   = 0x0100; // local_actor
-  static constexpr int is_migrated_from_flag  = 0x0200; // local_actor
-  static constexpr int has_used_aout_flag     = 0x0400; // local_actor
-  static constexpr int is_terminated_flag     = 0x0800; // local_actor
-  static constexpr int is_cleaned_up_flag     = 0x1000; // monitorable_actor
+  // flags storing runtime information                      used by ...
+  static constexpr int has_timeout_flag        = 0x0004; // single_timeout
+  static constexpr int is_registered_flag      = 0x0008; // (several actors)
+  static constexpr int is_initialized_flag     = 0x0010; // event-based actors
+  static constexpr int is_blocking_flag        = 0x0020; // blocking_actor
+  static constexpr int is_detached_flag        = 0x0040; // local_actor
+  static constexpr int is_serializable_flag    = 0x0100; // local_actor
+  static constexpr int is_migrated_from_flag   = 0x0200; // local_actor
+  static constexpr int has_used_aout_flag      = 0x0400; // local_actor
+  static constexpr int is_terminated_flag      = 0x0800; // local_actor
+  static constexpr int is_cleaned_up_flag      = 0x1000; // monitorable_actor
+  static constexpr int is_shutting_down_flag   = 0x2000; // scheduled_actor
 
   inline void setf(int flag) {
     auto x = flags();
@@ -226,4 +224,3 @@ private:
 
 } // namespace caf
 
-#endif // CAF_ABSTRACT_ACTOR_HPP

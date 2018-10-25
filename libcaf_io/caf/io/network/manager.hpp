@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_IO_NETWORK_MANAGER_HPP
-#define CAF_IO_NETWORK_MANAGER_HPP
+#pragma once
 
 #include "caf/message.hpp"
 #include "caf/ref_counted.hpp"
@@ -65,14 +63,11 @@ public:
   /// Adds the I/O device to the event loop of the middleman.
   virtual void add_to_loop() = 0;
 
-  /// Called by the underlying I/O device to report failures.
-  virtual void io_failure(execution_unit* ctx, operation op) = 0;
+  /// Detaches this manager from its parent in case of an error.
+  void io_failure(execution_unit* ctx, operation op);
 
   /// Get the address of the underlying I/O device.
   virtual std::string addr() const = 0;
-
-  /// Get the port of the underlying I/O device.
-  virtual uint16_t port() const = 0;
 
 protected:
   /// Creates a message signalizing a disconnect to the parent.
@@ -88,4 +83,3 @@ protected:
 } // namespace io
 } // namespace caf
 
-#endif // CAF_IO_NETWORK_MANAGER_HPP

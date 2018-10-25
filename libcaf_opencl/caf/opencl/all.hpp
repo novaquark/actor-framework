@@ -6,7 +6,6 @@
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
  * Copyright (C) 2011 - 2016                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  * Raphael Hiesgen <raphael.hiesgen (at) haw-hamburg.de>                      *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
@@ -18,9 +17,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_OPENCL_ALL_HPP
-#define CAF_OPENCL_ALL_HPP
+#pragma once
 
 #include "caf/opencl/manager.hpp"
 
-#endif // CAF_OPENCL_ALL_HPP

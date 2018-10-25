@@ -6,7 +6,6 @@
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
  * Copyright (C) 2011 - 2016                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_OPENCL_ACTOR_FACADE_HPP
-#define CAF_OPENCL_ACTOR_FACADE_HPP
+#pragma once
 
 #include <ostream>
 #include <iostream>
@@ -28,7 +26,10 @@
 #include "caf/all.hpp"
 
 #include "caf/intrusive_ptr.hpp"
+#include "caf/raise_error.hpp"
 
+#include "caf/detail/raw_ptr.hpp"
+#include "caf/detail/command_helper.hpp"
 #include "caf/detail/limited_vector.hpp"
 
 #include "caf/opencl/global.hpp"
@@ -39,17 +40,13 @@
 #include "caf/opencl/arguments.hpp"
 #include "caf/opencl/opencl_err.hpp"
 
-#include "caf/opencl/detail/core.hpp"
-#include "caf/opencl/detail/raw_ptr.hpp"
-#include "caf/opencl/detail/command_helper.hpp"
-
 namespace caf {
 namespace opencl {
 
 class manager;
 
 template <bool PassConfig, class... Ts>
-class actor_facade : public monitorable_actor {
+class actor_facade : public local_actor {
 public:
   using arg_types = detail::type_list<Ts...>;
   using unpacked_types = typename detail::tl_map<arg_types, extract_type>::type;
@@ -88,22 +85,14 @@ public:
                       const char* kernel_name, const nd_range& range,
                       input_mapping map_args, output_mapping map_result,
                       Ts&&... xs) {
-    if (range.dimensions().empty()) {
-      auto str = "OpenCL kernel needs at least 1 global dimension.";
-      CAF_LOG_ERROR(str);
-      throw std::runtime_error(str);
-    }
-    auto check_vec = [&](const dim_vec& vec, const char* name) {
-      if (! vec.empty() && vec.size() != range.dimensions().size()) {
-        std::ostringstream oss;
-        oss << name << " vector is not empty, but "
-            << "its size differs from global dimensions vector's size";
-        CAF_LOG_ERROR(CAF_ARG(oss.str()));
-        throw std::runtime_error(oss.str());
-      }
+    if (range.dimensions().empty())
+      CAF_RAISE_ERROR("OpenCL kernel needs at least 1 global dimension");
+    auto check_vec = [&](const dim_vec& vec) {
+      if (!vec.empty() && vec.size() != range.dimensions().size())
+        CAF_RAISE_ERROR("illegal vector size");
     };
-    check_vec(range.offsets(), "offsets");
-    check_vec(range.local_dimensions(), "local dimensions");
+    check_vec(range.offsets());
+    check_vec(range.local_dimensions());
     auto& sys = actor_conf.host->system();
     auto itr = prog->available_kernels_.find(kernel_name);
     if (itr == prog->available_kernels_.end()) {
@@ -185,7 +174,7 @@ public:
                detail::raw_kernel_ptr kernel, nd_range range,
                input_mapping map_args, output_mapping map_result,
                std::tuple<Ts...> xs)
-      : monitorable_actor(actor_conf),
+      : local_actor(actor_conf),
         kernel_(std::move(kernel)),
         program_(prog->program_),
         context_(prog->context_),
@@ -459,6 +448,10 @@ public:
     return true;
   }
 
+  void launch(execution_unit*, bool, bool) override {
+    CAF_RAISE_ERROR("launch of the actor facade should not be called");
+  }
+
   detail::raw_kernel_ptr kernel_;
   detail::raw_program_ptr program_;
   detail::raw_context_ptr context_;
@@ -473,4 +466,3 @@ public:
 } // namespace opencl
 } // namespace caf
 
-#endif // CAF_OPENCL_ACTOR_FACADE_HPP

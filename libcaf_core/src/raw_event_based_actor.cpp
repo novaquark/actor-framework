@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -68,7 +67,7 @@ invoke_message_result raw_event_based_actor::consume(mailbox_element& x) {
     auto& tm = content.get_as<timeout_msg>(0);
     auto tid = tm.timeout_id;
     CAF_ASSERT(!x.mid.valid());
-    if (is_active_timeout(tid)) {
+    if (is_active_receive_timeout(tid)) {
       CAF_LOG_DEBUG("handle timeout message");
       if (bhvr_stack_.empty())
         return im_dropped;

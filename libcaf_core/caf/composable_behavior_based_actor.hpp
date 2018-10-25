@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_COMPOSABLE_STATE_BASED_ACTOR_HPP
-#define CAF_COMPOSABLE_STATE_BASED_ACTOR_HPP
+#pragma once
 
 #include "caf/stateful_actor.hpp"
 #include "caf/message_handler.hpp"
@@ -51,4 +49,3 @@ class composable_behavior_based_actor : public stateful_actor<State, Base> {
 
 } // namespace caf
 
-#endif // CAF_COMPOSABLE_STATE_BASED_ACTOR_HPP

@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -482,13 +481,13 @@ pybind11::tuple tuple_from_message(const type_erased_tuple& msg) {
     if (str_ptr == nullptr) {
       set_py_exception("Unable to extract element #", i, " from message: ",
                        "could not get portable name of ", rtti.second->name());
-      return {};
+      return pybind11::tuple{};
     }
     auto kvp = bindings.find(*str_ptr);
     if (kvp == bindings.end()) {
       set_py_exception(R"(Unable to add element of type ")",
                        *str_ptr, R"(" to message: type is unknown to CAF)");
-      return {};
+      return pybind11::tuple{};
     }
     auto obj = kvp->second->to_object(msg, i);
     PyTuple_SetItem(result.ptr(), static_cast<int>(i), obj.release().ptr());
@@ -575,7 +574,7 @@ CAF_MODULE_INIT_RES caf_module_init() {
 }
 
 
-} // namespace <anonymous> 
+} // namespace <anonymous>
 } // namespace python
 } // namespace caf
 

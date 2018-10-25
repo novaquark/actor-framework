@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -21,11 +20,12 @@
 
 #include <unordered_set>
 
+#include "caf/actor_system_config.hpp"
+#include "caf/event_based_actor.hpp"
+#include "caf/raise_error.hpp"
+#include "caf/raw_event_based_actor.hpp"
 #include "caf/send.hpp"
 #include "caf/to_string.hpp"
-#include "caf/event_based_actor.hpp"
-#include "caf/actor_system_config.hpp"
-#include "caf/raw_event_based_actor.hpp"
 
 #include "caf/policy/work_sharing.hpp"
 #include "caf/policy/work_stealing.hpp"
@@ -87,13 +87,13 @@ behavior config_serv_impl(stateful_actor<kvstate>* self) {
         // we never put a nullptr in our map
         auto subscriber = actor_cast<actor>(subscriber_ptr);
         if (subscriber != self->current_sender())
-          self->send(subscriber, update_atom::value, key, vp.second);
+          self->send(subscriber, update_atom::value, key, vp.first);
       }
       // also iterate all subscribers for '*'
       for (auto& subscriber : self->state.data[wildcard].second)
         if (subscriber != self->current_sender())
           self->send(actor_cast<actor>(subscriber), update_atom::value,
-                     key, vp.second);
+                     key, vp.first);
     },
     // get a key/value pair
     [=](get_atom, std::string& key) -> message {
@@ -203,6 +203,21 @@ actor_system::module::~module() {
   // nop
 }
 
+const char* actor_system::module::name() const noexcept {
+  switch (id()) {
+    case scheduler:
+      return "Scheduler";
+    case middleman:
+      return "Middleman";
+    case opencl_manager:
+      return "OpenCL Manager";
+    case openssl_manager:
+      return "OpenSSL Manager";
+    default:
+      return "???";
+  }
+}
+
 actor_system::actor_system(actor_system_config& cfg)
     : ids_(0),
       types_(*this),
@@ -215,16 +230,20 @@ actor_system::actor_system(actor_system_config& cfg)
       cfg_(cfg),
       logger_dtor_done_(false) {
   CAF_SET_LOGGER_SYS(this);
+  for (auto& hook : cfg.thread_hooks_)
+    hook->init(*this);
   for (auto& f : cfg.module_factories) {
     auto mod_ptr = f(*this);
     modules_[mod_ptr->id()].reset(mod_ptr);
   }
   auto& sched = modules_[module::scheduler];
-  using test = scheduler::test_coordinator;
-  using share = scheduler::coordinator<policy::work_sharing>;
-  using steal = scheduler::coordinator<policy::work_stealing>;
-  using profiled_share = scheduler::profiled_coordinator<policy::profiled<policy::work_sharing>>;
-  using profiled_steal = scheduler::profiled_coordinator<policy::profiled<policy::work_stealing>>;
+  using namespace scheduler;
+  using policy::work_sharing;
+  using policy::work_stealing;
+  using share = coordinator<work_sharing>;
+  using steal = coordinator<work_stealing>;
+  using profiled_share = profiled_coordinator<policy::profiled<work_sharing>>;
+  using profiled_steal = profiled_coordinator<policy::profiled<work_stealing>>;
   // set scheduler only if not explicitly loaded by user
   if (!sched) {
     enum sched_conf {
@@ -236,16 +255,18 @@ actor_system::actor_system(actor_system_config& cfg)
       profiled_sharing  = 0x0102
     };
     sched_conf sc = stealing;
-    if (cfg.scheduler_policy == atom("sharing"))
+    namespace sr = defaults::scheduler;
+    auto sr_policy = get_or(cfg, "scheduler.policy", sr::policy);
+    if (sr_policy == atom("sharing"))
       sc = sharing;
-    else if (cfg.scheduler_policy == atom("testing"))
+    else if (sr_policy == atom("testing"))
       sc = testing;
-    else if (cfg.scheduler_policy != atom("stealing"))
-      std::cerr << "[WARNING] " << deep_to_string(cfg.scheduler_policy)
+    else if (sr_policy != atom("stealing"))
+      std::cerr << "[WARNING] " << deep_to_string(sr_policy)
                 << " is an unrecognized scheduler pollicy, "
                    "falling back to 'stealing' (i.e. work-stealing)"
                 << std::endl;
-    if (cfg.scheduler_enable_profiling)
+    if (get_or(cfg, "scheduler.enable-profiling", false))
       sc = static_cast<sched_conf>(sc | profiled);
     switch (sc) {
       default: // any invalid configuration falls back to work stealing
@@ -261,7 +282,7 @@ actor_system::actor_system(actor_system_config& cfg)
         sched.reset(new profiled_share(*this));
         break;
       case testing:
-        sched.reset(new test(*this));
+        sched.reset(new test_coordinator(*this));
     }
   }
   // initialize state for each module and give each module the opportunity
@@ -288,25 +309,32 @@ actor_system::actor_system(actor_system_config& cfg)
 }
 
 actor_system::~actor_system() {
-  CAF_LOG_DEBUG("shutdown actor system");
-  if (await_actors_before_shutdown_)
-    await_all_actors_done();
-  // shutdown internal actors
-  for (auto& x : internal_actors_) {
-    anon_send_exit(x, exit_reason::user_shutdown);
-    x = nullptr;
+  {
+    CAF_LOG_TRACE("");
+    CAF_LOG_DEBUG("shutdown actor system");
+    if (await_actors_before_shutdown_)
+      await_all_actors_done();
+    // shutdown internal actors
+    for (auto& x : internal_actors_) {
+      anon_send_exit(x, exit_reason::user_shutdown);
+      x = nullptr;
+    }
+    registry_.erase(atom("SpawnServ"));
+    registry_.erase(atom("ConfigServ"));
+    registry_.erase(atom("StreamServ"));
+    // group module is the first one, relies on MM
+    groups_.stop();
+    // stop modules in reverse order
+    for (auto i = modules_.rbegin(); i != modules_.rend(); ++i) {
+      auto& ptr = *i;
+      if (ptr != nullptr) {
+        CAF_LOG_DEBUG("stop module" << ptr->name());
+        ptr->stop();
+      }
+    }
+    await_detached_threads();
+    registry_.stop();
   }
-  registry_.erase(atom("SpawnServ"));
-  registry_.erase(atom("ConfigServ"));
-  registry_.erase(atom("StreamServ"));
-  // group module is the first one, relies on MM
-  groups_.stop();
-  // stop modules in reverse order
-  for (auto i = modules_.rbegin(); i != modules_.rend(); ++i)
-    if (*i)
-      (*i)->stop();
-  await_detached_threads();
-  registry_.stop();
   // reset logger and wait until dtor was called
   CAF_SET_LOGGER_SYS(nullptr);
   logger_.reset();
@@ -401,6 +429,10 @@ void actor_system::await_all_actors_done() const {
   registry_.await_running_count_equal(0);
 }
 
+actor_clock& actor_system::clock() noexcept {
+  return scheduler().clock();
+}
+
 void actor_system::inc_detached_threads() {
   ++detached;
 }
@@ -415,6 +447,16 @@ void actor_system::await_detached_threads() {
   std::unique_lock<std::mutex> guard{detached_mtx};
   while (detached != 0)
     detached_cv.wait(guard);
+}
+
+void actor_system::thread_started() {
+  for (auto& hook : cfg_.thread_hooks_)
+    hook->thread_started();
+}
+
+void actor_system::thread_terminates() {
+  for (auto& hook : cfg_.thread_hooks_)
+    hook->thread_terminates();
 }
 
 expected<strong_actor_ptr>

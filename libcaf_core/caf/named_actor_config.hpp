@@ -6,7 +6,6 @@
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
  * Copyright (C) 2011 - 2015                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_NAMED_ACTOR_CONFIG_HPP
-#define CAF_NAMED_ACTOR_CONFIG_HPP
+#pragma once
 
 #include <cstddef>
 
@@ -44,4 +42,3 @@ typename Inspector::result_type inspect(Inspector& f, named_actor_config& x) {
 
 } // namespace caf
 
-#endif //CAF_NAMED_ACTOR_CONFIG_HPP

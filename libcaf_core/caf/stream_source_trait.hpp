@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,26 +16,35 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_STREAM_SOURCE_TRAIT_HPP
-#define CAF_STREAM_SOURCE_TRAIT_HPP
+#pragma once
+
+#include "caf/fwd.hpp"
 
 #include "caf/detail/type_traits.hpp"
 
 namespace caf {
 
-template <class F>
-struct stream_source_trait;
+/// Deduces the output type and the state type for a stream source from its
+/// `pull` implementation.
+template <class Pull>
+struct stream_source_trait {
+  static constexpr bool valid = false;
+  using output = unit_t;
+  using state = unit_t;
+};
 
 template <class State, class T>
 struct stream_source_trait<void (State&, downstream<T>&, size_t)> {
+  static constexpr bool valid = true;
   using output = T;
   using state = State;
 };
 
-template <class F>
+/// Convenience alias for extracting the function signature from `Pull` and
+/// passing it to `stream_source_trait`.
+template <class Pull>
 using stream_source_trait_t =
-  stream_source_trait<typename detail::get_callable_trait<F>::fun_sig>;
+  stream_source_trait<typename detail::get_callable_trait<Pull>::fun_sig>;
 
 } // namespace caf
 
-#endif // CAF_STREAM_SOURCE_TRAIT_HPP

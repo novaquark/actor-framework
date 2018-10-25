@@ -1,15 +1,18 @@
-cmake_minimum_required(VERSION 2.8.4)
+cmake_minimum_required(VERSION 2.8.12)
 project(caf C CXX)
 
-# be nice to vim users
+include(CheckCSourceCompiles)
+include(CheckCSourceRuns)
+
+# Be nice to VIM users and Clang tools.
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-# silence policy CMP0042 warning by enabling RPATH explicitly
+# Silence policy CMP0042 warning by enabling RPATH explicitly.
 if(APPLE AND NOT DEFINED CMAKE_MACOSX_RPATH)
   set(CMAKE_MACOSX_RPATH true)
 endif()
 
-# shared libs currently not supported on Windows
+# Shared libs are currently not supported on Windows.
 if(WIN32 AND NOT CAF_BUILD_STATIC_ONLY)
   message(STATUS "CAF currently only supports static-only builds on Windows")
   set(CAF_BUILD_STATIC_ONLY yes)
@@ -42,26 +45,49 @@ if(CAF_BUILD_STATIC_RUNTIME)
       endif()
     endif()
   endforeach()
+else()
+  set(CAF_BUILD_STATIC_RUNTIME no)
 endif()
 
 # add helper target that simplifies re-running configure
 add_custom_target(configure COMMAND ${CMAKE_CURRENT_BINARY_DIR}/config.status)
 
 ################################################################################
-#                        set included flags if needed                          #
+#                              utility functions                               #
 ################################################################################
 
-if(CAF_FORCE_NO_EXCEPTIONS)
-  set(CAF_NO_EXCEPTIONS yes)
-endif()
+# Appends `str` to the variable named `var` with a whitespace as separator.
+# Suppresses a leading whitespace if the variable is empty and does nothing if
+# `str` is empty.
+function(build_string var str)
+  if(NOT str STREQUAL "")
+    if("${${var}}" STREQUAL "")
+      set("${var}" "${str}" PARENT_SCOPE)
+    else()
+      set("${var}" "${${var}} ${str}" PARENT_SCOPE)
+    endif()
+  endif()
+endfunction(build_string)
+
+# Forces `var` to 'no' if the content of the variables evaluates to false.
+function(pretty_no var)
+  if(NOT "${${var}}")
+    set("${var}" no PARENT_SCOPE)
+  endif()
+endfunction(pretty_no)
+
+# Forces `var` to 'yes' if the content of the variables evaluates to false.
+function(pretty_yes var)
+  if("${${var}}")
+    set("${var}" yes PARENT_SCOPE)
+  endif()
+endfunction(pretty_yes)
 
 ################################################################################
 #                        set prefix paths if available                         #
 ################################################################################
 
-if(DEFINED CAF_QT_PREFIX_PATH)
-  set(CMAKE_PREFIX_PATH "${CAF_QT_PREFIX_PATH}")
-endif()
+build_string("CMAKE_PREFIX_PATH" "${CAF_QT_PREFIX_PATH}")
 
 ################################################################################
 #                      enable ccache if required by user                       #
@@ -72,59 +98,27 @@ if(CAF_USE_CCACHE)
   if(CCACHE_PROGRAM)
     message(STATUS "Using ccache command: ${CCACHE_PROGRAM}")
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK "${CCACHE_PROGRAM}")
   else()
     message(STATUS "Unable to find ccache")
   endif()
 endif(CAF_USE_CCACHE)
 
 ################################################################################
-#   make sure all variables are set to "no" if undefined for summary output    #
+#      make sure config parameters are printed with yes or no in summary       #
 ################################################################################
 
-if(NOT CAF_ENABLE_RUNTIME_CHECKS)
-  set(CAF_ENABLE_RUNTIME_CHECKS no)
-endif()
-
-if(NOT CAF_ENABLE_INSTRUMENTATION)
-    set(CAF_ENABLE_INSTRUMENTATION no)
-endif()
-
-if(NOT CAF_NO_MEM_MANAGEMENT)
-  set(CAF_NO_MEM_MANAGEMENT no)
-endif()
-
-if(NOT CAF_NO_EXCEPTIONS)
-  set(CAF_NO_EXCEPTIONS no)
-endif()
-
-if(NOT CAF_BUILD_STATIC_ONLY)
-  set(CAF_BUILD_STATIC_ONLY no)
-endif()
-
-if(NOT CAF_BUILD_STATIC)
-  set(CAF_BUILD_STATIC no)
-endif()
-
-if(NOT CAF_NO_OPENCL)
-  set(CAF_NO_OPENCL no)
-endif()
-
-if(NOT CAF_NO_OPENSSL)
-  set(CAF_NO_OPENSSL no)
-endif()
-
-if(NOT CAF_NO_PYTHON)
-  set(CAF_NO_PYTHON no)
-endif()
-
-if(NOT CAF_NO_TOOLS)
-  set(CAF_NO_TOOLS no)
-endif()
-
-if(NOT CAF_NO_SUMMARY)
-  set(CAF_NO_SUMMARY no)
-endif()
+pretty_yes("CAF_FORCE_NO_EXCEPTIONS")
+pretty_no("CAF_ENABLE_INSTRUMENTATION")
+pretty_no("CAF_ENABLE_RUNTIME_CHECKS")
+pretty_no("CAF_NO_MEM_MANAGEMENT")
+pretty_no("CAF_NO_EXCEPTIONS")
+pretty_no("CAF_BUILD_STATIC_ONLY")
+pretty_no("CAF_BUILD_STATIC")
+pretty_no("CAF_NO_OPENCL")
+pretty_no("CAF_NO_OPENSSL")
+pretty_no("CAF_NO_PYTHON")
+pretty_no("CAF_NO_TOOLS")
+pretty_no("CAF_NO_SUMMARY")
 
 if(NOT CAF_NO_IO)
   set(CAF_NO_IO no)
@@ -157,7 +151,7 @@ set(CAF_VERSION
 ################################################################################
 
 # prohibit in-source builds
-if("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_BINARY_DIR}")
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL "${CMAKE_CURRENT_BINARY_DIR}")
     message(FATAL_ERROR "In-source builds are not allowed. Please use "
                         "./configure to choose a build directory and "
                         "initialize the build configuration.")
@@ -165,14 +159,14 @@ endif()
 # set module path appropriately
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # set binary output path if not defined by user
-if("${EXECUTABLE_OUTPUT_PATH}" STREQUAL "")
+if(EXECUTABLE_OUTPUT_PATH STREQUAL "")
   set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_BINARY_DIR}/bin")
 endif()
 # set library output path if not defined by user, but always set
 # library output path to binary output path for Xcode projects
-if("${CMAKE_GENERATOR}" STREQUAL "Xcode")
+if(CMAKE_GENERATOR STREQUAL "Xcode")
   set(LIBRARY_OUTPUT_PATH "${EXECUTABLE_OUTPUT_PATH}")
-elseif("${LIBRARY_OUTPUT_PATH}" STREQUAL "")
+elseif(LIBRARY_OUTPUT_PATH STREQUAL "")
   set(LIBRARY_OUTPUT_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib")
 endif()
 
@@ -182,7 +176,7 @@ endif()
 ################################################################################
 
 # check for g++ >= 4.8 or clang++ > = 3.2
-if(NOT WIN32 AND NOT CAF_NO_COMPILER_CHECK)
+if(NOT WIN32 AND NOT CAF_NO_COMPILER_CHECK AND NOT CMAKE_CROSSCOMPILING)
   try_run(ProgramResult
           CompilationSucceeded
           "${CMAKE_CURRENT_BINARY_DIR}"
@@ -190,13 +184,13 @@ if(NOT WIN32 AND NOT CAF_NO_COMPILER_CHECK)
           RUN_OUTPUT_VARIABLE CompilerVersion)
   if(NOT CompilationSucceeded OR NOT ProgramResult EQUAL 0)
     message(FATAL_ERROR "Cannot determine compiler version")
-  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     if(CompilerVersion VERSION_GREATER 4.7)
       message(STATUS "Found g++ version ${CompilerVersion}")
     else()
       message(FATAL_ERROR "g++ >= 4.8 required (found: ${CompilerVersion})")
     endif()
-  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     if(CompilerVersion VERSION_GREATER 3.1)
       message(STATUS "Found clang++ version ${CompilerVersion}")
     else()
@@ -208,43 +202,43 @@ if(NOT WIN32 AND NOT CAF_NO_COMPILER_CHECK)
   endif()
 endif()
 # set optional build flags
-set(EXTRA_FLAGS "")
 # increase max. template depth on GCC and Clang
-if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang"
-   OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-  set(EXTRA_FLAGS "-ftemplate-depth=512 -ftemplate-backtrace-limit=0")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+   OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  build_string("EXTRA_FLAGS" "-ftemplate-depth=512 -ftemplate-backtrace-limit=0")
 endif()
 # explicitly disable obnoxious GCC warnings
-if("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-  set(EXTRA_FLAGS "-Wno-missing-field-initializers")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  build_string("EXTRA_FLAGS" "-Wno-missing-field-initializers")
 endif()
 # add "-Werror" flag if --pedantic-build is used
 if(CAF_CXX_WARNINGS_AS_ERRORS)
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -Werror")
+  build_string("EXTRA_FLAGS" "-Werror")
 endif()
 # set compiler flags for GCOV if requested
 if(CAF_ENABLE_GCOV)
-  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(NO_INLINE "-fno-inline")
   else()
     set(NO_INLINE "-fno-inline -fno-inline-small-functions -fno-default-inline")
   endif()
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -fprofile-arcs -ftest-coverage ${NO_INLINE}")
+  build_string("EXTRA_FLAGS" "-fprofile-arcs -ftest-coverage ${NO_INLINE}")
 endif()
 # set -fno-exception if requested
 if(CAF_FORCE_NO_EXCEPTIONS)
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -fno-exceptions")
+  build_string("EXTRA_FLAGS" "-fno-exceptions")
 endif()
 # enable a ton of warnings if --more-clang-warnings is used
 if(CAF_MORE_WARNINGS)
-  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(WFLAGS "-Weverything -Wno-c++98-compat -Wno-padded "
                "-Wno-documentation-unknown-command -Wno-exit-time-destructors "
                "-Wno-global-constructors -Wno-missing-prototypes "
                "-Wno-c++98-compat-pedantic -Wno-unused-member-function "
                "-Wno-unused-const-variable -Wno-switch-enum "
+               "-Wno-abstract-vbase-init "
                "-Wno-missing-noreturn -Wno-covered-switch-default")
-  elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(WFLAGS "-Waddress -Wall -Warray-bounds "
                "-Wattributes -Wbuiltin-macro-redefined -Wcast-align "
                "-Wcast-qual -Wchar-subscripts -Wclobbered -Wcomment "
@@ -261,16 +255,17 @@ if(CAF_MORE_WARNINGS)
                "-Wnon-virtual-dtor -Wnonnull -Woverflow "
                "-Woverlength-strings -Wparentheses "
                "-Wpmf-conversions -Wpointer-arith -Wreorder "
-               "-Wreturn-type -Wsequence-point -Wshadow "
+               "-Wreturn-type -Wsequence-point "
                "-Wsign-compare -Wswitch -Wtype-limits -Wundef "
                "-Wuninitialized -Wunused -Wvla -Wwrite-strings")
   endif()
   # convert CMake list to a single string, erasing the ";" separators
   string(REPLACE ";" "" WFLAGS_STR ${WFLAGS})
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} ${WFLAGS_STR}")
+  build_string("EXTRA_FLAGS" "${WFLAGS_STR}")
 endif()
+
 # add -stdlib=libc++ when using Clang if possible
-if(NOT CAF_NO_AUTO_LIBCPP AND "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+if(NOT CAF_NO_AUTO_LIBCPP AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CXXFLAGS_BACKUP "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "-std=c++11 -stdlib=libc++")
   try_run(ProgramResult
@@ -283,7 +278,7 @@ if(NOT CAF_NO_AUTO_LIBCPP AND "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
   else()
     message(STATUS "Automatically added '-stdlib=libc++' flag "
                    "(CAF_NO_AUTO_LIBCPP not defined)")
-    set(EXTRA_FLAGS "${EXTRA_FLAGS} -stdlib=libc++")
+  build_string("EXTRA_FLAGS" "-stdlib=libc++")
   endif()
   # restore CXX flags
   set(CMAKE_CXX_FLAGS "${CXXFLAGS_BACKUP}")
@@ -301,45 +296,51 @@ if(CAF_ENABLE_ADDRESS_SANITIZER)
     message(WARNING "Address Sanitizer is not available on selected compiler")
   else()
     message(STATUS "Enable Address Sanitizer")
-    set(EXTRA_FLAGS "${EXTRA_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    build_string("EXTRA_FLAGS" "-fsanitize=address -fno-omit-frame-pointer")
   endif()
   # restore CXX flags
   set(CMAKE_CXX_FLAGS "${CXXFLAGS_BACKUP}")
 endif(CAF_ENABLE_ADDRESS_SANITIZER)
 # -pthread is ignored on MacOSX but required on other platforms
 if(NOT APPLE AND NOT WIN32)
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -pthread")
+    build_string("EXTRA_FLAGS" "-pthread")
 endif()
 # -fPIC generates warnings on MinGW and Cygwin plus extra setup steps needed on MinGW
 if(MINGW)
   add_definitions(-D_WIN32_WINNT=0x0600)
   add_definitions(-DWIN32)
   include(GenerateExportHeader)
-  set(LD_FLAGS "ws2_32 -liphlpapi")
+  list(APPEND CAF_EXTRA_LDFLAGS -lws2_32 -liphlpapi -lpsapi)
   # build static to avoid runtime dependencies to GCC libraries
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -static")
+  build_string("EXTRA_FLAGS" "-static")
 elseif(CYGWIN)
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -U__STRICT_ANSI__")
+  build_string("EXTRA_FLAGS" "-U__STRICT_ANSI__")
 else()
-  set(EXTRA_FLAGS "${EXTRA_FLAGS} -fPIC")
+  build_string("EXTRA_FLAGS" "-fPIC")
 endif()
 if (WIN32)
-  set(LD_FLAGS ${LD_FLAGS} ws2_32 iphlpapi)
+  list(APPEND CAF_EXTRA_LDFLAGS ws2_32 iphlpapi)
 endif()
 # iOS support
 if(CAF_OSX_SYSROOT)
   set(CMAKE_OSX_SYSROOT "${CAF_OSX_SYSROOT}")
 endif()
 if(CAF_IOS_DEPLOYMENT_TARGET)
-  if("${CAF_OSX_SYSROOT}" STREQUAL "iphonesimulator")
-    set(EXTRA_FLAGS "${EXTRA_FLAGS} -mios-simulator-version-min=${CAF_IOS_DEPLOYMENT_TARGET}")
+  if(CAF_OSX_SYSROOT STREQUAL "iphonesimulator")
+    build_string("EXTRA_FLAGS"
+                 "-mios-simulator-version-min=${CAF_IOS_DEPLOYMENT_TARGET}")
   else()
-    set(EXTRA_FLAGS "${EXTRA_FLAGS} -miphoneos-version-min=${CAF_IOS_DEPLOYMENT_TARGET}")
+    build_string("EXTRA_FLAGS"
+                 "-miphoneos-version-min=${CAF_IOS_DEPLOYMENT_TARGET}")
   endif()
 endif()
 # check if the user provided CXXFLAGS, set defaults otherwise
 if(NOT CMAKE_CXX_FLAGS)
   set(CMAKE_CXX_FLAGS                   "-std=c++11 -Wextra -Wall -pedantic ${EXTRA_FLAGS}")
+endif()
+if (NOT "${CMAKE_CXX_FLAGS}" MATCHES "-std=")
+  message(STATUS "Supplied CXXFLAGS do not contain a C++ standard, setting std to c++11")
+  set(CMAKE_CXX_FLAGS                   "-std=c++11 ${CMAKE_CXX_FLAGS}")
 endif()
 if(NOT CMAKE_CXX_FLAGS_DEBUG)
   set(CMAKE_CXX_FLAGS_DEBUG             "-O0 -g")
@@ -358,72 +359,25 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 # needed by subprojects
-set(LD_FLAGS ${LD_FLAGS} ${CMAKE_LD_LIBS})
-
-################################################################################
-#                       configure build_config.hpp header                      #
-################################################################################
-
-if(CAF_LOG_LEVEL)
-  set(CAF_LOG_LEVEL_INT ${CAF_LOG_LEVEL})
-else()
-  set(CAF_LOG_LEVEL_INT -1)
+if (DEFINED CMAKE_LD_LIBS)
+  list(APPEND ${CMAKE_LD_LIBS})
 endif()
 
-macro(to_int_value name)
-  if(${name})
-    set(${name}_INT 1)
-  else()
-    set(${name}_INT -1)
-  endif()
-endmacro()
+################################################################################
+#                                setup logging                                 #
+################################################################################
 
-to_int_value(CAF_LOG_LEVEL)
-to_int_value(CAF_NO_EXCEPTIONS)
-to_int_value(CAF_NO_MEM_MANAGEMENT)
-to_int_value(CAF_ENABLE_RUNTIME_CHECKS)
-to_int_value(CAF_ENABLE_INSTRUMENTATION)
-
-# find boost asio if the asio multiplexer should be used for testing
-if(CAF_USE_ASIO)
-  set(Boost_USE_MULTITHREADED ON)
-  find_package(Boost COMPONENTS system)
-  if(Boost_FOUND)
-    include_directories(${Boost_INCLUDE_DIRS})
-    set(LD_DIRS ${LD_DIRS} ${Boost_LIBRARIES})
-    set(LD_FLAGS ${LD_FLAGS} ${Boost_SYSTEM_LIBRARY})
-    set(CAF_USE_ASIO_INT 1)
-  else()
-    set(CAF_USE_ASIO no)
-    set(CAF_USE_ASIO_INT -1)
-  endif()
-else()
-  set(CAF_USE_ASIO_INT -1)
+if(NOT CAF_LOG_LEVEL)
+  set(CAF_LOG_LEVEL "-1")
 endif()
-
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_config.hpp.in"
-               "${CMAKE_CURRENT_SOURCE_DIR}/libcaf_core/caf/detail/build_config.hpp"
-               IMMEDIATE @ONLY)
-
 
 ################################################################################
 #                           setup for install target                           #
 ################################################################################
 
-# install includes from core
-install(DIRECTORY libcaf_core/caf/
-        DESTINATION include/caf FILES_MATCHING PATTERN "*.hpp")
-# install includes from io
-install(DIRECTORY libcaf_io/caf/ DESTINATION include/caf
-        FILES_MATCHING PATTERN "*.hpp")
 # install includes from test
 install(DIRECTORY libcaf_test/caf/ DESTINATION include/caf
         FILES_MATCHING PATTERN "*.hpp")
-# install includes from opencl
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libcaf_opencl/CMakeLists.txt")
-  install(DIRECTORY libcaf_opencl/caf/ DESTINATION include/caf
-        FILES_MATCHING PATTERN "*.hpp")
-endif()
 
 # process cmake_uninstall.cmake.in
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
@@ -536,8 +490,34 @@ add_optional_caf_lib(io)
 if(NOT CAF_NO_OPENSSL)
   find_package(OpenSSL)
   if(OPENSSL_FOUND)
-    include_directories(BEFORE ${OPENSSL_INCLUDE_DIR})
-    add_optional_caf_lib(openssl)
+    # Check OpenSSL version >= 1.0.1
+    if (OPENSSL_VERSION VERSION_LESS 1.0.1)
+      message(STATUS
+              "Disable OpenSSL. Required >= 1.0.1 due to TLSv1.2 support.")
+      set(CAF_NO_OPENSSL yes)
+    else()
+      if(NOT CMAKE_CROSSCOMPILING)
+        # Check if openssl headers and library versions match
+        set(CMAKE_REQUIRED_LIBRARIES ${OPENSSL_LIBRARIES})
+        set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
+        check_c_source_runs("
+          #include <openssl/opensslv.h>
+          #include <openssl/crypto.h>
+          int main() {
+            if (SSLeay() == OPENSSL_VERSION_NUMBER) {
+              return 0;
+            }
+            return -1;
+          }
+        " OPENSSL_CORRECT_VERSION_NUMBER)
+        if (NOT OPENSSL_CORRECT_VERSION_NUMBER)
+          message(FATAL_ERROR
+            "OpenSSL library version does not match headers")
+        endif()
+      endif()
+      include_directories(BEFORE ${OPENSSL_INCLUDE_DIR})
+      add_optional_caf_lib(openssl)
+    endif()
   else(OPENSSL_FOUND)
     set(CAF_NO_OPENSSL yes)
   endif(OPENSSL_FOUND)
@@ -548,6 +528,7 @@ if(NOT CAF_NO_OPENCL)
   if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} GREATER 3.0)
     find_package(OpenCL)
     if(OpenCL_FOUND)
+      include_directories(BEFORE ${OpenCL_INCLUDE_DIRS})
       add_optional_caf_lib(opencl)
       add_optional_caf_binaries(libcaf_opencl/examples)
     else()
@@ -586,7 +567,7 @@ if(NOT CAF_NO_UNIT_TESTS)
                  libcaf_test/caf/test/unit_test_impl.hpp
                  ${CAF_ALL_UNIT_TESTS})
   target_link_libraries(caf-test
-                        ${LD_FLAGS}
+                        ${CAF_EXTRA_LDFLAGS}
                         ${CAF_LIBRARIES}
                         ${PTHREAD_LIBRARIES})
   add_custom_target(all_unit_tests)
@@ -606,12 +587,7 @@ if(NOT CAF_NO_UNIT_TESTS)
   macro (make_test suite)
     string(REPLACE " " "_" test_name ${suite})
     set(caf_test ${EXECUTABLE_OUTPUT_PATH}/caf-test)
-    add_test(${test_name} ${caf_test} -n -v 5 -s "${suite}" ${ARGN})
-    # add some extra unit testing options when testing ASIO as well
-    if(CAF_USE_ASIO AND "${suite}" MATCHES "^io_.+$")
-      add_test(${test_name}_asio ${caf_test} -n -v 5 -s
-               "${suite}" ${ARGN} -- "--caf#middleman.network-backend=asio")
-    endif()
+    add_test(${test_name} ${caf_test} -r 300 -n -v 5 -s "${suite}" ${ARGN})
   endmacro ()
   list(LENGTH suites num_suites)
   message(STATUS "Found ${num_suites} test suites")
@@ -621,77 +597,59 @@ if(NOT CAF_NO_UNIT_TESTS)
 endif()
 
 
-################################################################################
-#                                Doxygen setup                                 #
-################################################################################
+# -- Fetch branch name and SHA if available ------------------------------------
 
-# check for doxygen and add custom "doc" target to Makefile
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in"
-                 "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile"
-                 @ONLY)
-  add_custom_target(doc "${DOXYGEN_EXECUTABLE}"
-                    "${CMAKE_HOME_DIRECTORY}/Doxyfile"
-                    WORKING_DIRECTORY "${CMAKE_HOME_DIRECTORY}"
-                    COMMENT "Generating API documentation with Doxygen"
-                    VERBATIM)
-endif(DOXYGEN_FOUND)
-
-################################################################################
-#                                Manual setup                                  #
-################################################################################
-
-set(MANUAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/manual")
-if(EXISTS "${MANUAL_DIR}"
-   AND EXISTS "${MANUAL_DIR}/variables.tex.in"
-   AND EXISTS "${MANUAL_DIR}/conf.py.in")
-  # retrieve current branch name for CAF
-  execute_process(COMMAND git rev-parse --abbrev-ref HEAD
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                  OUTPUT_VARIABLE GIT_BRANCH
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  # retrieve current SHA1 hash for CAF
-  execute_process(COMMAND git log --pretty=format:%h -n 1
-                  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                  OUTPUT_VARIABLE CAF_SHA
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  # retrieve current SHA1 hash for the Manual
-  execute_process(COMMAND git log --pretty=format:%h -n 1
-                  WORKING_DIRECTORY ${MANUAL_DIR}
-                  OUTPUT_VARIABLE CAF_MANUAL_SHA
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(${GIT_BRANCH} STREQUAL "master")
-    # retrieve current tag name for CAF
-    execute_process(COMMAND git describe --tags --contains ${CAF_SHA}
+if(EXISTS "release.txt")
+  file(READ "release.txt" CAF_VESION)
+else()
+  set(CAF_RELEASE "${CAF_VERSION}")
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    # retrieve current branch name for CAF
+    execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    RESULT_VARIABLE GIT_TAG_RES
-                    OUTPUT_VARIABLE GIT_TAG
+                    RESULT_VARIABLE gitBranchResult
+                    OUTPUT_VARIABLE gitBranch
                     ERROR_QUIET
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    # prefer tag name over auto-generated version
-    if("${GIT_TAG_RES}" STREQUAL "0")
-      set(CAF_RELEASE "${GIT_TAG}")
-    else()
-      set(CAF_RELEASE "${CAF_VERSION}")
+    # retrieve current SHA1 hash for CAF
+    execute_process(COMMAND ${GIT_EXECUTABLE} log --pretty=format:%h -n 1
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                    RESULT_VARIABLE gitShaResult
+                    OUTPUT_VARIABLE gitSha
+                    ERROR_QUIET
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(gitBranchResult EQUAL 0 AND gitShaResult EQUAL 0)
+      # generate semantic CAF version for manual
+      set(CAF_RELEASE "${CAF_VERSION}+exp.sha.${gitSha}")
+      # check whether we're building the manual for a stable release
+      if(gitBranch STREQUAL "master")
+        # retrieve current tag name for CAF
+        execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --contains ${gitSha}
+                        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+                        RESULT_VARIABLE gitTagResult
+                        OUTPUT_VARIABLE gitTag
+                        ERROR_QUIET
+                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+        # tags indicate stable releases -> use tag name as release version
+        if(gitTagResult EQUAL 0)
+          set(CAF_RELEASE "${gitTag}")
+        endif()
+      endif()
     endif()
-  else()
-    set(CAF_RELEASE "${CAF_VERSION}+exp.sha.${CAF_SHA}")
   endif()
-  MESSAGE(STATUS "Set manual version to ${CAF_RELEASE}")
-  configure_file("${MANUAL_DIR}/variables.tex.in"
-                 "${MANUAL_DIR}/variables.tex"
-                 IMMEDIATE @ONLY)
-  configure_file("${MANUAL_DIR}/conf.py.in"
-                 "${MANUAL_DIR}/conf.py"
-                 IMMEDIATE @ONLY)
-  configure_file("${MANUAL_DIR}/index_header.rst.in"
-                 "${MANUAL_DIR}/index_header.rst"
-                 IMMEDIATE @ONLY)
-  configure_file("${MANUAL_DIR}/index_footer.rst.in"
-                 "${MANUAL_DIR}/index_footer.rst"
-                 IMMEDIATE @ONLY)
 endif()
+
+message(STATUS "Set release version for all documentation to ${CAF_RELEASE}.")
+
+# -- Setup for building manual and API documentation ---------------------------
+
+# we need the examples and some headers relative to the build/doc/tex directory
+file(COPY examples/ DESTINATION examples)
+file(COPY libcaf_core/caf/exit_reason.hpp DESTINATION libcaf_core/caf/)
+file(COPY libcaf_core/caf/sec.hpp DESTINATION libcaf_core/caf/)
+
+add_subdirectory(doc)
 
 ################################################################################
 #                     Add additional project files to GUI                      #
@@ -743,12 +701,14 @@ invertYesNo(CAF_NO_PYTHON CAF_BUILD_PYTHON)
 # collect all compiler flags
 string(TOUPPER "${CMAKE_BUILD_TYPE}" UPPER_BUILD_TYPE)
 set(ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${UPPER_BUILD_TYPE}}")
+set(ALL_LD_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${CAF_EXTRA_LDFLAGS}")
+string(STRIP "${ALL_LD_FLAGS}" ALL_LD_FLAGS)
 # done
 if(NOT CAF_NO_SUMMARY)
   message(STATUS
         "\n====================|  Build Summary  |===================="
         "\n"
-        "\nLibcaf version:        ${CAF_VERSION}"
+        "\nCAF version:           ${CAF_VERSION}"
         "\n"
         "\nBuild type:            ${CMAKE_BUILD_TYPE}"
         "\nBuild static:          ${CAF_BUILD_STATIC}"
@@ -771,7 +731,7 @@ if(NOT CAF_NO_SUMMARY)
         "\n"
         "\nCXX:                   ${CMAKE_CXX_COMPILER}"
         "\nCXXFLAGS:              ${ALL_CXX_FLAGS}"
-        "\nLIBRARIES:             ${LD_FLAGS}"
+        "\nLINKER_FLAGS (shared)  ${ALL_LD_FLAGS}"
         "\n"
         "\nSource directory:      ${CMAKE_CURRENT_SOURCE_DIR}"
         "\nBuild directory:       ${CMAKE_CURRENT_BINARY_DIR}"

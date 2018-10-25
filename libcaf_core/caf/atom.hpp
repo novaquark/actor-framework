@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_ATOM_HPP
-#define CAF_ATOM_HPP
+#pragma once
 
 #include <string>
 #include <functional>
@@ -67,13 +65,22 @@ struct atom_constant {
   constexpr atom_constant() {
     // nop
   }
+
   /// Returns the wrapped value.
   constexpr operator atom_value() const {
     return V;
   }
+
+  /// Returns the wrapped value as its base type.
   static constexpr uint64_t uint_value() {
     return static_cast<uint64_t>(V);
   }
+
+  /// Returns the wrapped value.
+  static constexpr atom_value get_value() {
+    return V;
+  }
+
   /// Returns an instance *of this constant* (*not* an `atom_value`).
   static const atom_constant value;
 };
@@ -141,8 +148,14 @@ using unlink_atom = atom_constant<atom("unlink")>;
 /// Used for publishing actors at a given port.
 using publish_atom = atom_constant<atom("publish")>;
 
+/// Used for publishing actors at a given port.
+using publish_udp_atom = atom_constant<atom("pub_udp")>;
+
 /// Used for removing an actor/port mapping.
 using unpublish_atom = atom_constant<atom("unpublish")>;
+
+/// Used for removing an actor/port mapping.
+using unpublish_udp_atom = atom_constant<atom("unpub_udp")>;
 
 /// Used for signalizing group membership.
 using subscribe_atom = atom_constant<atom("subscribe")>;
@@ -152,6 +165,9 @@ using unsubscribe_atom = atom_constant<atom("unsubscrib")>;
 
 /// Used for establishing network connections.
 using connect_atom = atom_constant<atom("connect")>;
+
+/// Used for contacting a remote UDP endpoint
+using contact_atom = atom_constant<atom("contact")>;
 
 /// Used for opening ports or files.
 using open_atom = atom_constant<atom("open")>;
@@ -168,6 +184,15 @@ using migrate_atom = atom_constant<atom("migrate")>;
 /// Used for triggering periodic operations.
 using tick_atom = atom_constant<atom("tick")>;
 
+/// Used for pending out of order messages.
+using pending_atom = atom_constant<atom("pending")>;
+
+/// Used as timeout type for `timeout_msg`.
+using receive_atom = atom_constant<atom("receive")>;
+
+/// Used as timeout type for `timeout_msg`.
+using stream_atom = atom_constant<atom("stream")>;
+
 } // namespace caf
 
 namespace std {
@@ -182,4 +207,3 @@ struct hash<caf::atom_value> {
 
 } // namespace std
 
-#endif // CAF_ATOM_HPP

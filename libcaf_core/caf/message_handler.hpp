@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_MESSAGE_HANDLER_HPP
-#define CAF_MESSAGE_HANDLER_HPP
+#pragma once
 
 #include <list>
 #include <vector>
@@ -30,11 +28,12 @@
 #include "caf/none.hpp"
 #include "caf/intrusive_ptr.hpp"
 
-#include "caf/message.hpp"
-#include "caf/duration.hpp"
 #include "caf/behavior.hpp"
-#include "caf/ref_counted.hpp"
+#include "caf/duration.hpp"
+#include "caf/match_case.hpp"
 #include "caf/may_have_timeout.hpp"
+#include "caf/message.hpp"
+#include "caf/ref_counted.hpp"
 #include "caf/timeout_definition.hpp"
 
 #include "caf/detail/behavior_impl.hpp"
@@ -146,4 +145,3 @@ private:
 
 } // namespace caf
 
-#endif // CAF_MESSAGE_HANDLER_HPP

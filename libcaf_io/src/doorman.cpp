@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -36,13 +35,6 @@ doorman::~doorman() {
 
 message doorman::detach_message() {
   return make_message(acceptor_closed_msg{hdl()});
-}
-
-void doorman::io_failure(execution_unit* ctx, network::operation op) {
-  CAF_LOG_TRACE(CAF_ARG(hdl().id()) << CAF_ARG(op));
-  // keep compiler happy when compiling w/o logging
-  static_cast<void>(op);
-  detach(ctx, true);
 }
 
 bool doorman::new_connection(execution_unit* ctx, connection_handle x) {

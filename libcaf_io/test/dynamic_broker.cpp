@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -20,7 +19,7 @@
 #include "caf/config.hpp"
 
 #define CAF_SUITE io_dynamic_broker
-#include "caf/test/unit_test.hpp"
+#include "caf/test/dsl.hpp"
 
 #include <memory>
 #include <iostream>
@@ -152,8 +151,8 @@ void run_client(int argc, char** argv, uint16_t port) {
   actor_system system{cfg.load<io::middleman>().parse(argc, argv)};
   auto p = system.spawn(ping, size_t{10});
   CAF_MESSAGE("spawn_client...");
-  CAF_EXP_THROW(cl, system.middleman().spawn_client(peer_fun, "127.0.0.1",
-                                                    port, p));
+  auto cl = unbox(system.middleman().spawn_client(peer_fun,
+                                                  "127.0.0.1", port, p));
   CAF_MESSAGE("spawn_client finished");
   anon_send(p, kickoff_atom::value, cl);
   CAF_MESSAGE("`kickoff_atom` has been send");

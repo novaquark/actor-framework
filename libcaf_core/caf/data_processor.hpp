@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,14 +16,14 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_DATA_PROCESSOR_HPP
-#define CAF_DATA_PROCESSOR_HPP
+#pragma once
 
 #include <chrono>
 #include <string>
 #include <cstdint>
 #include <cstddef> // size_t
 #include <type_traits>
+#include <iterator>
 
 #include "caf/fwd.hpp"
 #include "caf/atom.hpp"
@@ -584,4 +583,3 @@ private:
 
 } // namespace caf
 
-#endif // CAF_DATA_PROCESSOR_HPP

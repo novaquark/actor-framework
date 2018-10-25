@@ -6,7 +6,6 @@
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
  * Copyright (C) 2011 - 2016                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,18 +16,17 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_OPENCL_PROGRAM_HPP
-#define CAF_OPENCL_PROGRAM_HPP
+#pragma once
 
 #include <map>
 #include <memory>
 
 #include "caf/ref_counted.hpp"
 
+#include "caf/detail/raw_ptr.hpp"
+
 #include "caf/opencl/device.hpp"
 #include "caf/opencl/global.hpp"
-
-#include "caf/opencl/detail/raw_ptr.hpp"
 
 namespace caf {
 namespace opencl {
@@ -61,4 +59,3 @@ private:
 } // namespace opencl
 } // namespace caf
 
-#endif // CAF_OPENCL_PROGRAM_HPP

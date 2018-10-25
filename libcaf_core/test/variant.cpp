@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -128,3 +127,74 @@ CAF_TEST(copying_moving_roundtrips) {
   macro_repeat20(v20_test);
 }
 
+namespace {
+
+struct test_visitor {
+  template <class... Ts>
+  string operator()(const Ts&... xs) {
+    return deep_to_string(std::forward_as_tuple(xs...));
+  }
+};
+
+} // namespace <anonymous>
+
+CAF_TEST(constructors) {
+  variant<int, string> a{42};
+  variant<string, atom_value> b{atom("foo")};
+  variant<float, int, string> c{string{"bar"}};
+  variant<int, string, double> d{123};
+  CAF_CHECK_EQUAL(a, 42);
+  CAF_CHECK_EQUAL(b, atom("foo"));
+  CAF_CHECK_EQUAL(d, 123);
+  CAF_CHECK_NOT_EQUAL(d, std::string{"123"});
+}
+
+CAF_TEST(n_ary_visit) {
+  variant<int, string> a{42};
+  variant<string, atom_value> b{atom("foo")};
+  variant<float, int, string> c{string{"bar"}};
+  variant<int, string, double> d{123};
+  test_visitor f;
+  CAF_CHECK_EQUAL(visit(f, a, b), "(42, 'foo')");
+  CAF_CHECK_EQUAL(visit(f, a, b, c), "(42, 'foo', \"bar\")");
+  CAF_CHECK_EQUAL(visit(f, a, b, c, d), "(42, 'foo', \"bar\", 123)");
+}
+
+CAF_TEST(get_if) {
+  variant<int ,string, atom_value> b = atom("foo");
+  CAF_MESSAGE("test get_if directly");
+  CAF_CHECK_EQUAL(get_if<int>(&b), nullptr);
+  CAF_CHECK_EQUAL(get_if<string>(&b), nullptr);
+  CAF_CHECK_NOT_EQUAL(get_if<atom_value>(&b), nullptr);
+  CAF_MESSAGE("test get_if via unit test framework");
+  CAF_CHECK_NOT_EQUAL(b, 42);
+  CAF_CHECK_NOT_EQUAL(b, string{"foo"});
+  CAF_CHECK_EQUAL(b, atom("foo"));
+}
+
+CAF_TEST(less_than) {
+  using variant_type = variant<char, int>;
+  auto a = variant_type{'x'};
+  auto b = variant_type{'y'};
+  CAF_CHECK(a < b);
+  CAF_CHECK(!(a > b));
+  CAF_CHECK(a <= b);
+  CAF_CHECK(!(a >= b));
+  b = 42;
+  CAF_CHECK(a < b);
+  CAF_CHECK(!(a > b));
+  CAF_CHECK(a <= b);
+  CAF_CHECK(!(a >= b));
+  a = 42;
+  CAF_CHECK(!(a < b));
+  CAF_CHECK(!(a > b));
+  CAF_CHECK(a <= b);
+  CAF_CHECK(a >= b);
+  b = 'x';
+}
+
+CAF_TEST(equality) {
+  variant<uint16_t, int> x = 42;
+  variant<uint16_t, int> y = uint16_t{42};
+  CAF_CHECK_NOT_EQUAL(x, y);
+}

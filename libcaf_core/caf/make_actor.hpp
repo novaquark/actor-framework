@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_MAKE_ACTOR_HPP
-#define CAF_MAKE_ACTOR_HPP
+#pragma once
 
 #include <type_traits>
 
@@ -34,7 +32,7 @@ namespace caf {
 
 template <class T, class R = infer_handle_from_class_t<T>, class... Ts>
 R make_actor(actor_id aid, node_id nid, actor_system* sys, Ts&&... xs) {
-#if defined(CAF_LOG_LEVEL) && CAF_LOG_LEVEL >= CAF_LOG_LEVEL_DEBUG
+#if CAF_LOG_LEVEL >= CAF_LOG_LEVEL_DEBUG
   actor_storage<T>* ptr = nullptr;
   if (logger::current_logger()->accepts(CAF_LOG_LEVEL_DEBUG,
                                         CAF_LOG_FLOW_COMPONENT)) {
@@ -56,4 +54,3 @@ R make_actor(actor_id aid, node_id nid, actor_system* sys, Ts&&... xs) {
 
 } // namespace caf
 
-#endif // CAF_MAKE_ACTOR_HPP

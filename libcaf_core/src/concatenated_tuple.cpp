@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,12 +16,13 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#include "caf/message.hpp"
-#include "caf/make_counted.hpp"
-
 #include "caf/detail/concatenated_tuple.hpp"
 
 #include <numeric>
+
+#include "caf/make_counted.hpp"
+#include "caf/message.hpp"
+#include "caf/raise_error.hpp"
 
 namespace caf {
 namespace detail {
@@ -107,7 +107,20 @@ error concatenated_tuple::save(size_t pos, serializer& sink) const {
   return selected.first->save(selected.second, sink);
 }
 
-std::pair<message_data*, size_t> concatenated_tuple::select(size_t pos) const {
+std::pair<message_data*, size_t> concatenated_tuple::select(size_t pos) {
+  auto idx = pos;
+  for (auto& m : data_) {
+    auto s = m->size();
+    if (idx >= s)
+      idx -= s;
+    else
+      return {m.get_unshared(), idx};
+  }
+  CAF_RAISE_ERROR(std::out_of_range, "concatenated_tuple::select out of range");
+}
+
+std::pair<const message_data*, size_t>
+concatenated_tuple::select(size_t pos) const {
   auto idx = pos;
   for (const auto& m : data_) {
     auto s = m->size();
@@ -116,7 +129,7 @@ std::pair<message_data*, size_t> concatenated_tuple::select(size_t pos) const {
     else
       return {m.get(), idx};
   }
-  CAF_RAISE_ERROR("out of range: concatenated_tuple::select");
+  CAF_RAISE_ERROR(std::out_of_range, "concatenated_tuple::select out of range");
 }
 
 } // namespace detail

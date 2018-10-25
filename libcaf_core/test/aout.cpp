@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -74,7 +73,7 @@ CAF_TEST(redirect_aout_globally) {
     }
   );
   self->await_all_other_actors_done();
-  CAF_CHECK_EQUAL(self->mailbox().count(), 0u);
+  CAF_CHECK_EQUAL(self->mailbox().size(), 0u);
 }
 
 CAF_TEST(global_and_local_redirect) {
@@ -100,7 +99,7 @@ CAF_TEST(global_and_local_redirect) {
   );
   CAF_CHECK(std::is_permutation(lines.begin(), lines.end(), expected.begin()));
   self->await_all_other_actors_done();
-  CAF_CHECK_EQUAL(self->mailbox().count(), 0u);
+  CAF_CHECK_EQUAL(self->mailbox().size(), 0u);
 }
 
 CAF_TEST_FIXTURE_SCOPE_END()

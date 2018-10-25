@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -136,6 +135,8 @@ bool is_tty(const std::ostream& out) {
 std::ostream& operator<<(std::ostream& out, term x) {
   if (is_tty(out))
     set_term_color(out, tty_codes[static_cast<size_t>(x)]);
+  else if (x == term::reset_endl)
+    out << '\n';
   return out;
 }
 

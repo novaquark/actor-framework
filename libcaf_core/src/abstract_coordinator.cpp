@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -28,22 +27,20 @@
 #include <unordered_map>
 #include <condition_variable>
 
-#include "caf/send.hpp"
-#include "caf/after.hpp"
-#include "caf/others.hpp"
-#include "caf/duration.hpp"
-#include "caf/actor_system.hpp"
-#include "caf/scoped_actor.hpp"
 #include "caf/actor_ostream.hpp"
-#include "caf/system_messages.hpp"
-#include "caf/scheduled_actor.hpp"
+#include "caf/actor_system.hpp"
 #include "caf/actor_system_config.hpp"
-
-#include "caf/scheduler/coordinator.hpp"
-
-#include "caf/policy/work_stealing.hpp"
-
+#include "caf/after.hpp"
+#include "caf/defaults.hpp"
+#include "caf/duration.hpp"
 #include "caf/logger.hpp"
+#include "caf/others.hpp"
+#include "caf/policy/work_stealing.hpp"
+#include "caf/scheduled_actor.hpp"
+#include "caf/scheduler/coordinator.hpp"
+#include "caf/scoped_actor.hpp"
+#include "caf/send.hpp"
+#include "caf/system_messages.hpp"
 
 namespace caf {
 namespace scheduler {
@@ -53,85 +50,6 @@ namespace scheduler {
  ******************************************************************************/
 
 namespace {
-
-using hrc = std::chrono::high_resolution_clock;
-
-class timer_actor : public blocking_actor {
-public:
-  explicit timer_actor(actor_config& cfg) : blocking_actor(cfg) {
-    // nop
-  }
-
-  struct delayed_msg {
-    strong_actor_ptr from;
-    strong_actor_ptr to;
-    message_id mid;
-    message msg;
-  };
-
-  void deliver(delayed_msg& dm) {
-    dm.to->enqueue(dm.from, dm.mid, std::move(dm.msg), nullptr);
-  }
-
-  template <class Map, class... Ts>
-  void insert_dmsg(Map& storage, const duration& d, Ts&&... xs) {
-    auto tout = hrc::now();
-    tout += d;
-    delayed_msg dmsg{std::forward<Ts>(xs)...};
-    storage.emplace(std::move(tout), std::move(dmsg));
-  }
-
-  void act() override {
-    // local state
-    accept_one_cond rc;
-    bool running = true;
-    std::multimap<hrc::time_point, delayed_msg> messages;
-    // our message handler
-    behavior nested{
-      [&](const duration& d, strong_actor_ptr& from,
-          strong_actor_ptr& to, message_id mid, message& msg) {
-        insert_dmsg(messages, d, std::move(from),
-                    std::move(to), mid, std::move(msg));
-      },
-      [&](const exit_msg& dm) {
-        if (dm.reason) {
-          fail_state(dm.reason);
-          running = false;
-        }
-      }
-    };
-    auto bhvr = detail::make_blocking_behavior(
-      &nested,
-      others >> [&](message_view& x) -> result<message> {
-        std::cerr << "*** unexpected message in timer_actor: "
-                  << to_string(x.content()) << std::endl;
-        return sec::unexpected_message;
-      }
-    );
-    // loop until receiving an exit message
-    while (running) {
-      if (messages.empty()) {
-        // use regular receive as long as we don't have a pending timeout
-        receive_impl(rc, message_id::make(), bhvr);
-      } else {
-        auto tout = messages.begin()->first;
-        if (await_data(tout)) {
-          receive_impl(rc, message_id::make(), bhvr);
-        } else {
-          auto it = messages.begin();
-          while (it != messages.end() && (it->first) <= tout) {
-            deliver(it->second);
-            it = messages.erase(it);
-          }
-        }
-      }
-    }
-  }
-
-  const char* name() const override {
-    return "timer_actor";
-  }
-};
 
 using string_sink = std::function<void (std::string&&)>;
 
@@ -315,21 +233,25 @@ public:
  *                       implementation of coordinator                        *
  ******************************************************************************/
 
-actor abstract_coordinator::printer() const {
-  CAF_ASSERT(printer_ != nullptr);
-  return actor_cast<actor>(printer_);
+const actor_system_config& abstract_coordinator::config() const {
+  return system_.config();
+}
+
+bool abstract_coordinator::detaches_utility_actors() const {
+  return true;
 }
 
 void abstract_coordinator::start() {
   CAF_LOG_TRACE("");
   // launch utility actors
-  timer_ = actor_cast<strong_actor_ptr>(system_.spawn<timer_actor, hidden + detached>());
-  printer_ = actor_cast<strong_actor_ptr>(system_.spawn<printer_actor, hidden + detached>());
+  static constexpr auto fs = hidden + detached;
+  utility_actors_[printer_id] = system_.spawn<printer_actor, fs>();
 }
 
 void abstract_coordinator::init(actor_system_config& cfg) {
-  max_throughput_ = cfg.scheduler_max_throughput;
-  num_workers_ = cfg.scheduler_max_threads;
+  namespace sr = defaults::scheduler;
+  max_throughput_ = get_or(cfg, "scheduler.max-throughput", sr::max_throughput);
+  num_workers_ = get_or(cfg, "scheduler.max-threads", sr::max_threads);
 }
 
 actor_system::module::id_t abstract_coordinator::id() const {
@@ -343,9 +265,9 @@ void* abstract_coordinator::subtype_ptr() {
 void abstract_coordinator::stop_actors() {
   CAF_LOG_TRACE("");
   scoped_actor self{system_, true};
-  anon_send_exit(timer_, exit_reason::user_shutdown);
-  anon_send_exit(printer_, exit_reason::user_shutdown);
-  self->wait_for(timer_, printer_);
+  for (auto& x : utility_actors_)
+    anon_send_exit(x, exit_reason::user_shutdown);
+  self->wait_for(utility_actors_);
 }
 
 abstract_coordinator::abstract_coordinator(actor_system& sys)

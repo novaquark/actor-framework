@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -24,12 +23,10 @@ namespace caf {
 namespace io {
 namespace network {
 
-multiplexer::multiplexer(actor_system* sys) : execution_unit(sys) {
+multiplexer::multiplexer(actor_system* sys)
+    : execution_unit(sys),
+      tid_(std::this_thread::get_id()) {
   // nop
-}
-
-boost::asio::io_service* pimpl() {
-  return nullptr;
 }
 
 multiplexer_ptr multiplexer::make(actor_system& sys) {
@@ -37,7 +34,7 @@ multiplexer_ptr multiplexer::make(actor_system& sys) {
   return multiplexer_ptr{new default_multiplexer(&sys)};
 }
 
-boost::asio::io_service* multiplexer::pimpl() {
+multiplexer_backend* multiplexer::pimpl() {
   return nullptr;
 }
 

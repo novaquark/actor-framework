@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,10 +16,11 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#include "caf/config.hpp"
+#include "caf/after.hpp"
 
 #define CAF_SUITE simple_timeout
-#include "caf/test/unit_test.hpp"
+
+#include "caf/test/dsl.hpp"
 
 #include <chrono>
 #include <memory>
@@ -71,34 +71,9 @@ timer::behavior_type timer_impl2(timer::pointer self) {
   };
 }
 
-struct config : actor_system_config {
-  config() {
-    scheduler_policy = atom("testing");
-  }
-};
-
-struct fixture {
-  config cfg;
-  actor_system system;
-  scoped_actor self;
-  scheduler::test_coordinator& sched;
-
-  fixture()
-      : system(cfg),
-        self(system),
-        sched(dynamic_cast<scheduler::test_coordinator&>(system.scheduler())) {
-    CAF_REQUIRE(sched.jobs.empty());
-    CAF_REQUIRE(sched.delayed_messages.empty());
-  }
-
-  ~fixture() {
-    sched.run_dispatch_loop();
-  }
-};
-
 } // namespace <anonymous>
 
-CAF_TEST_FIXTURE_SCOPE(simple_timeout_tests, fixture)
+CAF_TEST_FIXTURE_SCOPE(simple_timeout_tests, test_coordinator_fixture<>)
 
 CAF_TEST(duration_conversion) {
   duration d1{time_unit::milliseconds, 100};
@@ -109,11 +84,11 @@ CAF_TEST(duration_conversion) {
 }
 
 CAF_TEST(single_timeout) {
-  system.spawn(timer_impl);
+  sys.spawn(timer_impl);
 }
 
 CAF_TEST(single_anon_timeout) {
-  system.spawn(timer_impl2);
+  sys.spawn(timer_impl2);
 }
 
 CAF_TEST_FIXTURE_SCOPE_END()

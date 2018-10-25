@@ -5,8 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2017                                                  *
- * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
+ * Copyright 2011-2018 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -17,8 +16,7 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#ifndef CAF_GROUP_HPP
-#define CAF_GROUP_HPP
+#pragma once
 
 #include <string>
 #include <utility>
@@ -46,9 +44,6 @@ constexpr invalid_group_t invalid_group = invalid_group_t{};
 class group : detail::comparable<group>,
               detail::comparable<group, invalid_group_t> {
 public:
-  template <class, class, int>
-  friend class actor_cast_access;
-
   using signatures = none_t;
 
   group() = default;
@@ -162,4 +157,3 @@ struct hash<caf::group> {
 };
 } // namespace std
 
-#endif // CAF_GROUP_HPP
