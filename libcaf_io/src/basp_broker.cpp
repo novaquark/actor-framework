@@ -746,7 +746,7 @@ behavior basp_broker::make_behavior() {
 #ifdef CAF_ENABLE_INSTRUMENTATION
       auto msgtype = instrumentation::get_msgtype(msg);
       auto mb_wait_time = timestamp_ago_ns(this->current_message_ts());
-      auto mb_size = this->mailbox_cached_count();
+      auto mb_size = 0; // this->mailbox_cached_count();
       state.stats.record_broker_forward(msgtype, mb_wait_time, mb_size);
 #endif
       if (!dest || system().node() == dest->node()) {

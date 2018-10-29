@@ -703,7 +703,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       //auto start = caf::make_timestamp();
       auto msgtype = instrumentation::get_msgtype(current_element_->content());
       auto mb_wait_time = caf::timestamp_ago_ns(current_element_->ts);
-      auto mb_size = mailbox_.size(); // WARNING: using count() here can lock the actor when receiving network messages
+      auto mb_size = 0; // mailbox_.size(); // WARNING: using count() here can lock the actor when receiving network messages
 #endif
       switch (bhvr(visitor, x.content())) {
         default:
