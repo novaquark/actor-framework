@@ -82,5 +82,5 @@ std::string pretty_type_name(std::type_index x) {
   return result;
 }
 
-} // namespace detail 
+} // namespace detail
 } // namespace caf

@@ -53,15 +53,14 @@ public:
   /// An iterator over ::config_option unique pointers.
   using iterator = option_vector::iterator;
 
+  /// An iterator over ::config_option unique pointers.
+  using const_iterator = option_vector::const_iterator;
+
   /// Maps string keys to arbitrary (config) values.
   using dictionary = caf::dictionary<config_value>;
 
   /// Categorized settings.
   using config_map = caf::dictionary<dictionary>;
-
-  // -- constructors, destructors, and assignment operators --------------------
-
-  config_option_set();
 
   // -- properties -------------------------------------------------------------
 
@@ -84,37 +83,90 @@ public:
   option_pointer qualified_name_lookup(string_view name) const;
 
   /// Returns the number of stored config options.
-  inline size_t size() const noexcept {
+  size_t size() const noexcept {
     return opts_.size();
   }
 
+  /// Returns the number of stored config options.
+  bool empty() const noexcept {
+    return opts_.empty();
+  }
+
   /// Returns an iterator to the first ::config_option object.
-  inline iterator begin() noexcept {
+  iterator begin() noexcept {
+    return opts_.begin();
+  }
+
+  /// Returns an iterator to the first ::config_option object.
+  const_iterator begin() const noexcept {
     return opts_.begin();
   }
 
   /// Returns the past-the-end iterator.
-  inline iterator end() noexcept {
+  iterator end() noexcept {
+    return opts_.end();
+  }
+
+  /// Returns the past-the-end iterator.
+  const_iterator end() const noexcept {
     return opts_.end();
   }
 
   /// Adds a config option to the set.
   template <class T>
   config_option_set& add(string_view category, string_view name,
-                         string_view description = "") {
+                         string_view description) & {
     return add(make_config_option<T>(category, name, description));
+  }
+
+  /// Adds a config option to the set.
+  template <class T>
+  config_option_set& add(string_view name, string_view description) & {
+    return add(make_config_option<T>("global", name, description));
+  }
+
+  /// Adds a config option to the set.
+  template <class T>
+  config_option_set&& add(string_view category, string_view name,
+                          string_view description) && {
+    return std::move(add<T>(category, name, description));
+  }
+
+  /// Adds a config option to the set.
+  template <class T>
+  config_option_set&& add(string_view name, string_view description) && {
+    return std::move(add<T>("global", name, description));
   }
 
   /// Adds a config option to the set that synchronizes its value with `ref`.
   template <class T>
   config_option_set& add(T& ref, string_view category, string_view name,
-                         string_view description = "") {
+                         string_view description) & {
     return add(make_config_option<T>(ref, category, name, description));
   }
 
+  /// Adds a config option to the set that synchronizes its value with `ref`.
+  template <class T>
+  config_option_set& add(T& ref, string_view name, string_view description) & {
+    return add(ref, "global", name, description);
+  }
+
+  /// Adds a config option to the set that synchronizes its value with `ref`.
+  template <class T>
+  config_option_set&& add(T& ref, string_view category, string_view name,
+                          string_view description) && {
+    return std::move(add(ref, category, name, description));
+  }
+
+  /// Adds a config option to the set that synchronizes its value with `ref`.
+  template <class T>
+  config_option_set&& add(T& ref, string_view name,
+                          string_view description) && {
+    return std::move(add(ref, "global", name, description));
+  }
+
   /// Adds a config option to the set.
-  /// @private
-  config_option_set& add(config_option&& opt);
+  config_option_set& add(config_option opt);
 
   /// Generates human-readable help text for all options.
   std::string help_text(bool global_only = true) const;

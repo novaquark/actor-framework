@@ -60,13 +60,14 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --no-unit-tests             build without unit tests
     --no-opencl                 build without OpenCL module
     --no-openssl                build without OpenSSL module
-    --no-benchmarks             build without benchmarks
     --no-tools                  build without CAF tools such as caf-run
     --no-io                     build without I/O module
     --no-python                 build without python binding
     --no-summary                do not print configuration before building
-    --core-only                 sets no-examples, no-opencl, no-openssl,
-                                no-tools, no-python, and no-io
+    --libs-only                 sets no-examples, no-tools, no-python,
+                                and no-unit-tests
+    --core-only                 same as libs-only but also adds sets no-opencl,
+                                no-openssl, and no-io
 
   Debugging:
     --with-runtime-checks       build with requirement checks at runtime
@@ -282,28 +283,7 @@ while [ $# -ne 0 ]; do
             append_cache_entry CAF_IOS_DEPLOYMENT_TARGET STRING "$optarg"
             ;;
         --with-log-level=*)
-            level=`echo "$optarg" | tr '[:lower:]' '[:upper:]'`
-            case $level in
-                ERROR)
-                    append_cache_entry CAF_LOG_LEVEL STRING 0
-                    ;;
-                WARNING)
-                    append_cache_entry CAF_LOG_LEVEL STRING 1
-                    ;;
-                INFO)
-                    append_cache_entry CAF_LOG_LEVEL STRING 2
-                    ;;
-                DEBUG)
-                    append_cache_entry CAF_LOG_LEVEL STRING 3
-                    ;;
-                TRACE)
-                    append_cache_entry CAF_LOG_LEVEL STRING 4
-                    ;;
-                *)
-                    echo "Invalid log level '$level'. Try '$0 --help' to see valid values."
-                    exit 1
-                    ;;
-            esac
+            append_cache_entry CAF_LOG_LEVEL STRING "$optarg"
             ;;
         --with-clang=*)
             clang="$optarg"
@@ -371,9 +351,6 @@ while [ $# -ne 0 ]; do
         --with-python-config=*)
             append_cache_entry CAF_PYTHON_CONFIG_BIN FILEPATH "$optarg"
             ;;
-        --no-benchmarks)
-            append_cache_entry CAF_NO_BENCHMARKS BOOL yes
-            ;;
         --no-tools)
             append_cache_entry CAF_NO_TOOLS BOOL yes
             ;;
@@ -389,19 +366,21 @@ while [ $# -ne 0 ]; do
         --with-instrumentation)
             append_cache_entry CAF_ENABLE_INSTRUMENTATION BOOL yes
 	    ;;
+        --libs-only)
+            for var in CAF_NO_TOOLS CAF_NO_PYTHON CAF_NO_EXAMPLES  CAF_NO_UNIT_TESTS; do
+              append_cache_entry $var BOOL yes
+            done
+            ;;
         --core-only)
-            append_cache_entry CAF_NO_TOOLS BOOL yes
-            append_cache_entry CAF_NO_IO BOOL yes
-            append_cache_entry CAF_NO_PYTHON BOOL yes
-            append_cache_entry CAF_NO_EXAMPLES BOOL yes
-            append_cache_entry CAF_NO_OPENCL BOOL yes
-            append_cache_entry CAF_NO_OPENSSL BOOL yes
+            for var in CAF_NO_TOOLS CAF_NO_PYTHON CAF_NO_EXAMPLES  CAF_NO_UNIT_TESTS CAF_NO_IO CAF_NO_OPENCL CAF_NO_OPENSSL ; do
+              append_cache_entry $var BOOL yes
+            done
             ;;
         --dev-mode)
             append_cache_entry CMAKE_BUILD_TYPE STRING Debug
             append_cache_entry CAF_NO_EXAMPLES BOOL yes
             append_cache_entry CAF_NO_TOOLS BOOL yes
-            append_cache_entry CAF_LOG_LEVEL STRING 4
+            append_cache_entry CAF_LOG_LEVEL STRING TRACE
             append_cache_entry CAF_ENABLE_RUNTIME_CHECKS BOOL yes
             append_cache_entry CAF_ENABLE_ADDRESS_SANITIZER BOOL yes
             ;;

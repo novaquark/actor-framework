@@ -554,6 +554,14 @@ void put(dictionary<config_value::dictionary>& dict, string_view key,
   put_impl(dict, key, tmp);
 }
 
+/// Inserts a new list named `name` into the dictionary `xs` and returns
+/// a reference to it. Overrides existing entries with the same name.
+config_value::list& put_list(config_value::dictionary& xs, std::string name);
+
+/// Inserts a new list named `name` into the dictionary `xs` and returns
+/// a reference to it. Overrides existing entries with the same name.
+config_value::dictionary& put_dictionary(config_value::dictionary& xs,
+                                         std::string name);
 
 /// @relates config_value
 bool operator<(const config_value& x, const config_value& y);

@@ -22,6 +22,7 @@
 
 #include "caf/fwd.hpp"
 #include "caf/logger.hpp"
+#include "caf/detail/log_level.hpp"
 #include "caf/ref_counted.hpp"
 #include "caf/infer_handle.hpp"
 #include "caf/intrusive_ptr.hpp"

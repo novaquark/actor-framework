@@ -584,11 +584,24 @@ scheduled_actor::categorize(mailbox_element& x) {
       auto em = content.move_if_unshared<exit_msg>(0);
       // make sure to get rid of attachables if they're no longer needed
       unlink_from(em.source);
-      // exit_reason::kill is always fatal
-      if (em.reason == exit_reason::kill)
+      // exit_reason::kill is always fatal and also aborts streams.
+      if (em.reason == exit_reason::kill) {
         quit(std::move(em.reason));
-      else
+        std::vector<stream_manager_ptr> xs;
+        for (auto& kvp : stream_managers_)
+          xs.emplace_back(kvp.second);
+        for (auto& kvp : pending_stream_managers_)
+          xs.emplace_back(kvp.second);
+        std::sort(xs.begin(), xs.end());
+        auto last = std::unique(xs.begin(), xs.end());
+        std::for_each(xs.begin(), last, [&](stream_manager_ptr& mgr) {
+          mgr->stop(exit_reason::kill);
+        });
+        stream_managers_.clear();
+        pending_stream_managers_.clear();
+      } else {
         call_handler(exit_handler_, this, em);
+      }
       return message_category::internal;
     }
     case make_type_token<down_msg>(): {
@@ -1190,7 +1203,8 @@ scheduled_actor::advance_streams(actor_clock::time_point now) {
     for (auto& kvp : qs) {
       auto inptr = kvp.second.policy().handler.get();
       auto bs = static_cast<int32_t>(kvp.second.total_task_size());
-      inptr->emit_ack_batch(this, bs, cycle, bc);
+      inptr->emit_ack_batch(this, bs, inptr->mgr->out().max_capacity(),
+                            cycle, bc);
     }
   }
   return stream_ticks_.next_timeout(now, {max_batch_delay_ticks_,

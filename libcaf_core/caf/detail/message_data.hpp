@@ -50,7 +50,7 @@ public:
 
   // -- pure virtual observers -------------------------------------------------
 
-  virtual cow_ptr copy() const = 0;
+  virtual message_data* copy() const = 0;
 
   // -- observers --------------------------------------------------------------
 

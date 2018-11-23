@@ -51,16 +51,23 @@ void stream_manager::handle(inbound_path*, downstream_msg::batch&) {
   CAF_LOG_WARNING("unimplemented base handler for batches called");
 }
 
-void stream_manager::handle(inbound_path*, downstream_msg::close&) {
-  // nop
+void stream_manager::handle(inbound_path* in, downstream_msg::close&) {
+  // Reset the actor handle to make sure no further messages travel upstream.
+  in->hdl = nullptr;
 }
 
 void stream_manager::handle(inbound_path* in, downstream_msg::forced_close& x) {
   CAF_ASSERT(in != nullptr);
   CAF_LOG_TRACE(CAF_ARG2("slots", in->slots) << CAF_ARG(x));
-  // Reset the actor handle to make sure no further message travels upstream.
+  // Reset the actor handle to make sure no further messages travel upstream.
   in->hdl = nullptr;
-  stop(std::move(x.reason));
+  // A continuous stream exists independent of sources. Hence, we ignore
+  // upstream errors in this case.
+  if (!continuous()) {
+    stop(std::move(x.reason));
+  } else {
+    CAF_LOG_INFO("received (and ignored) forced_close from a source");
+  }
 }
 
 bool stream_manager::handle(stream_slots slots, upstream_msg::ack_open& x) {
@@ -95,7 +102,9 @@ void stream_manager::handle(stream_slots slots, upstream_msg::ack_batch& x) {
   auto path = out().path(slots.receiver);
   if (path != nullptr) {
     path->open_credit += x.new_capacity;
+    path->max_capacity = x.max_capacity;
     CAF_ASSERT(path->open_credit >= 0);
+    CAF_ASSERT(path->max_capacity >= 0);
     path->set_desired_batch_size(x.desired_batch_size);
     path->next_ack_id = x.acknowledged_id + 1;
     // Gravefully remove path after receiving its final ACK.
@@ -151,7 +160,7 @@ void stream_manager::advance() {
       // Ignore inbound paths of other managers.
       if (inptr->mgr.get() == this) {
         auto bs = static_cast<int32_t>(kvp.second.total_task_size());
-        inptr->emit_ack_batch(self_, bs, interval, bc);
+        inptr->emit_ack_batch(self_, bs, out().max_capacity(), interval, bc);
       }
     }
   }
@@ -183,6 +192,11 @@ void stream_manager::deliver_handshake(response_promise& rp, stream_slot slot,
 
 bool stream_manager::generate_messages() {
   return false;
+}
+
+const downstream_manager& stream_manager::out() const {
+  // We restore the const when returning from this member function.
+  return const_cast<stream_manager*>(this)->out();
 }
 
 void stream_manager::cycle_timeout(size_t) {

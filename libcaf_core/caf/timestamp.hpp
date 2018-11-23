@@ -46,14 +46,14 @@ using timestamp = std::chrono::time_point<
 /// the current system time.
 timestamp make_timestamp();
 
-/// Converts the time-since-epoch of `x` to a `string`.
-std::string timestamp_to_string(const timestamp& x);
+/// Prints `x` in ISO 8601 format, e.g., `2018-11-15T06:25:01.462`.
+std::string timestamp_to_string(timestamp x);
 
-/// Appends the time-since-epoch of `y` to `x`.
-void append_timestamp_to_string(std::string& x, const timestamp& y);
+/// Appends the timestamp `x` in ISO 8601 format, e.g.,
+/// `2018-11-15T06:25:01.462`, to `y`.
+void append_timestamp_to_string(std::string& x, timestamp y);
 
 /// How long ago (in nanoseconds) was the given timestamp?
 int64_t timestamp_ago_ns(const timestamp& ts);
 
 } // namespace caf
-

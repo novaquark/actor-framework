@@ -84,6 +84,7 @@ foreach (comp ${CAF_FIND_COMPONENTS})
       find_library(CAF_LIBRARY_${UPPERCOMP}
                    NAMES
                      "caf_${comp}"
+                     "caf_${comp}_static"
                    HINTS
                      ${library_hints}
                      /usr/lib
@@ -102,7 +103,9 @@ foreach (comp ${CAF_FIND_COMPONENTS})
   endif ()
 endforeach ()
 
-list(REMOVE_DUPLICATES CAF_INCLUDE_DIRS)
+if (DEFINED CAF_INCLUDE_DIRS)
+  list(REMOVE_DUPLICATES CAF_INCLUDE_DIRS)
+endif()
 
 # let CMake check whether all requested components have been found
 include(FindPackageHandleStandardArgs)
