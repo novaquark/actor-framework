@@ -37,6 +37,7 @@ namespace caf {
     void setTraceAppend(TraceAppend append);
     TraceAppend getTraceAppend();
     std::string getCurrentContext();
+    std::string getCurrentContextString();
     void setContext(std::string const& context);
     void resetContext();
     void openTrace(std::string const& name);

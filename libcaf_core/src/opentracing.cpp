@@ -32,6 +32,20 @@ namespace caf {
       static thread_local std::unique_ptr<opentracing::Span> currentSpan;
       static thread_local std::unique_ptr<opentracing::SpanContext> currentContext;
       static TraceAppend traceAppend = TraceAppend::FirstAtom;
+
+      class TextMapStore: public opentracing::TextMapWriter
+      {
+        public:
+            opentracing::expected<void> Set(opentracing::string_view k, opentracing::string_view v) const override
+            {
+                if ((std::string)k == "uber-trace-id")
+                    _str = v;
+                return {};
+            }
+            std::string str() { return _str; }
+      private:
+          mutable std::string _str;
+      };
     }
 
     void setTraceAppend(TraceAppend append) {
@@ -58,6 +72,22 @@ namespace caf {
         opentracing::Tracer::Global()->Inject(*sc, ss);
         return ss.str();
       }
+    }
+
+    std::string getCurrentContextString()
+    {
+        TextMapStore tms;
+        auto cs = currentSpan.get();
+        if (cs) {
+            opentracing::Tracer::Global()->Inject(cs->context(), tms);
+        }
+        else {
+            auto sc = currentContext.get();
+            if (!sc)
+                return std::string();
+            opentracing::Tracer::Global()->Inject(*sc, tms);
+        }
+        return tms.str();
     }
 
     void setContext(std::string const& context) {
