@@ -23,113 +23,177 @@ namespace detail {
 
 namespace {
 
-using guard_type = std::unique_lock<std::recursive_mutex>;
+using guard_type = std::unique_lock<std::mutex>;
 
-} // namespace <anonymous>
+} // namespace
 
 thread_safe_actor_clock::thread_safe_actor_clock() : done_(false) {
   // nop
 }
 
-void thread_safe_actor_clock::set_ordinary_timeout(time_point t,
-                                                  abstract_actor* self,
-                                                  atom_value type,
-                                                  uint64_t id) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::set_ordinary_timeout(t, self, type, id);
+// only accessed under a lock, but in theory several instance might be used
+// TODO: clean that
+static std::atomic<int> maxThreadIndex;
+
+static thread_local int currentThreadIndex = -1;
+
+void thread_safe_actor_clock::enqueueInvocation(Pouet::value_type&& i) {
+  if (currentThreadIndex <= 0) {
+    currentThreadIndex = maxThreadIndex++;
+    CAF_ASSERT(currentThreadIndex < MaxThread);
+  }
+  {
+    TLSQueue& queue = kaouest_[currentThreadIndex];
+    guard_type guard{queue.mutex};
+    queue.messages.push_back(std::move(i));
+  }
+  {
+    // lock or not lock
+    // there is a race condition if we don't take the lock.
     cv_.notify_all();
   }
+}
+
+void thread_safe_actor_clock::set_ordinary_timeout(time_point t,
+                                                   abstract_actor* self,
+                                                   atom_value type,
+                                                   uint64_t id) {
+
+  enqueueInvocation(Pouet::set_ordinary_timeout{t, self, type, id});
 }
 
 void thread_safe_actor_clock::set_request_timeout(time_point t,
                                                   abstract_actor* self,
                                                   message_id id) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::set_request_timeout(t, self, id);
-    cv_.notify_all();
-  }
+  enqueueInvocation(Pouet::set_request_timeout{t, self, id});
 }
 
 void thread_safe_actor_clock::cancel_ordinary_timeout(abstract_actor* self,
                                                       atom_value type) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::cancel_ordinary_timeout(self, type);
-    cv_.notify_all();
-  }
+  enqueueInvocation(Pouet::cancel_ordinary_timeout{self, type});
 }
 
 void thread_safe_actor_clock::cancel_request_timeout(abstract_actor* self,
                                                      message_id id) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::cancel_request_timeout(self, id);
-    cv_.notify_all();
-  }
+  enqueueInvocation(Pouet::cancel_request_timeout{self, id});
 }
 
 void thread_safe_actor_clock::cancel_timeouts(abstract_actor* self) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::cancel_timeouts(self);
-    cv_.notify_all();
-  }
+  enqueueInvocation(Pouet::cancel_timeouts{self});
 }
 
 void thread_safe_actor_clock::schedule_message(time_point t,
                                                strong_actor_ptr receiver,
                                                mailbox_element_ptr content) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::schedule_message(t, std::move(receiver), std::move(content));
-    cv_.notify_all();
-  }
+  enqueueInvocation(
+    Pouet::schedule_message{t, std::move(receiver), std::move(content)});
 }
 
 void thread_safe_actor_clock::schedule_message(time_point t, group target,
                                                strong_actor_ptr sender,
                                                message content) {
-  guard_type guard{mx_};
-  if (!done_) {
-    super::schedule_message(t, std::move(target), std::move(sender),
-                            std::move(content));
-    cv_.notify_all();
-  }
+  enqueueInvocation(Pouet::schedule_message_group{
+    t, std::move(target), std::move(sender), std::move(content)});
+}
+
+void thread_safe_actor_clock::set_multi_timeout(time_point t,
+                                                abstract_actor* self,
+                                                atom_value type, uint64_t id) {
+  enqueueInvocation(Pouet::set_multi_timeout{t, self, type, id});
 }
 
 void thread_safe_actor_clock::cancel_all() {
-  guard_type guard{mx_};
-  super::cancel_all();
-  cv_.notify_all();
+  enqueueInvocation(Pouet::cancel_all{});
+}
+
+struct thread_safe_actor_clock::Pouet::visitor {
+  simple_actor_clock& clock;
+
+  void operator()(set_ordinary_timeout& v) {
+    clock.set_ordinary_timeout(v.t, v.self, v.type, v.id);
+  }
+
+  void operator()(set_request_timeout& v) {
+    clock.set_request_timeout(v.t, v.self, v.id);
+  }
+
+  void operator()(cancel_ordinary_timeout& v) {
+    clock.cancel_ordinary_timeout(v.self, v.type);
+  }
+
+  void operator()(cancel_request_timeout& v) {
+    clock.cancel_request_timeout(v.self, v.id);
+  }
+
+  void operator()(cancel_timeouts& v) {
+    clock.cancel_timeouts(v.self);
+  }
+
+  void operator()(schedule_message& v) {
+    clock.schedule_message(v.t, std::move(v.receiver), std::move(v.content));
+  }
+
+  void operator()(schedule_message_group& v) {
+    clock.schedule_message(v.t, std::move(v.target), std::move(v.sender),
+                           std::move(v.content));
+  }
+
+  void operator()(set_multi_timeout& v) {
+    clock.set_multi_timeout(v.t, v.self, v.type, v.id);
+  }
+
+  void operator()(cancel_all&) {
+    clock.cancel_all();
+  }
+};
+
+void thread_safe_actor_clock::pumpMessages() {
+  // called under the lock
+  int currentMax = maxThreadIndex.load();
+  Pouet::visitor aVisitor{realClock_};
+  for (int i = 0; i < currentMax; ++i) {
+    // this loop might be a bit expansive, find a way to cut it.
+    TLSQueue& queue = kaouest_.at(i);
+    {
+      // only lock while swapping the buffers.
+      guard_type guard{queue.mutex};
+      std::swap(queue.messages, queue.tempBuffer);
+      queue.messages.clear();
+    }
+
+    for (auto& val : queue.tempBuffer) {
+      visit(aVisitor, val);
+    }
+    queue.tempBuffer.clear();
+  }
 }
 
 void thread_safe_actor_clock::run_dispatch_loop() {
-  visitor f{this};
+  simple_actor_clock::visitor f{&realClock_};
   guard_type guard{mx_};
   while (done_ == false) {
     // Wait for non-empty schedule.
     // Note: The thread calling run_dispatch_loop() is guaranteed not to lock
     //       the mutex recursively. Otherwise, cv_.wait() or cv_.wait_until()
     //       would be unsafe, because wait operations call unlock() only once.
-    if (schedule_.empty()) {
+    pumpMessages();
+    if (realClock_.schedule().empty()) {
       cv_.wait(guard);
     } else {
-      auto tout = schedule_.begin()->first;
+      auto tout = realClock_.schedule().begin()->first;
       cv_.wait_until(guard, tout);
     }
     // Double-check whether schedule is non-empty and execute it.
-    if (!schedule_.empty()) {
+    if (!realClock_.schedule().empty()) {
       auto t = now();
-      auto i = schedule_.begin();
-      while (i != schedule_.end() && i->first <= t) {
+      auto i = realClock_.schedule().begin();
+      while (i != realClock_.schedule().end() && i->first <= t) {
         visit(f, i->second);
-        i = schedule_.erase(i);
+        i = realClock_.schedule().erase(i);
       }
     }
   }
-  schedule_.clear();
+  realClock_.schedule().clear();
 }
 
 void thread_safe_actor_clock::cancel_dispatch_loop() {

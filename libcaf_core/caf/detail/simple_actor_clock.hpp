@@ -167,6 +167,10 @@ public:
     return schedule_;
   }
 
+  inline map_type& schedule() {
+    return schedule_;
+  }
+
   inline const secondary_map& actor_lookup() const {
     return actor_lookup_;
   }
