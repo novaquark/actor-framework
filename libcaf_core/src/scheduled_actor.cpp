@@ -719,15 +719,6 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
           case rt_error:
           case rt_value:
             visitor.visit(sres);
-#ifdef CAF_ENABLE_INSTRUMENTATION
-            if (context_ != nullptr) {
-              if (allow_individual_instrumentation()) {
-                context_->stats().record_behavior_individual(instrumentation::get_instrumented_actor_id(*this), msgtype, mb_wait_time, mb_size);
-              } else {
-                context_->stats().record_behavior_aggregate(typeid(*this), msgtype, mb_wait_time, mb_size);
-              }
-            }
-#endif
             break;
           case rt_skip:
             skipped = true;
@@ -740,16 +731,6 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       auto& bhvr = bhvr_stack_.back();
       switch (bhvr(visitor, x.content())) {
         default:
-#ifdef CAF_ENABLE_INSTRUMENTATION
-          // TODO examine the case of detached scheduled_actors
-          if (context_ != nullptr) {
-            if (allow_individual_instrumentation()) {
-              context_->stats().record_behavior_individual(instrumentation::get_instrumented_actor_id(*this), msgtype, mb_wait_time, mb_size);
-            } else {
-              context_->stats().record_behavior_aggregate(typeid(*this), msgtype, mb_wait_time, mb_size);
-            }
-          }
-#endif
           break;
         case match_case::skip:
           skipped = true;
@@ -757,7 +738,21 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         case match_case::no_match:
           call_default_handler();
       }
-      return !skipped ? im_success : im_skipped;
+      if (!skipped)
+      {
+#ifdef CAF_ENABLE_INSTRUMENTATION
+          // TODO examine the case of detached scheduled_actors
+          if (context_ != nullptr) {
+              if (allow_individual_instrumentation()) {
+                  context_->stats().record_behavior_individual(instrumentation::get_instrumented_actor_id(*this), msgtype, mb_wait_time, mb_size);
+              } else {
+                  context_->stats().record_behavior_aggregate(typeid(*this), msgtype, mb_wait_time, mb_size);
+              }
+          }
+#endif
+          return im_success;
+      }
+      return im_skipped;
     }
   }
   // Unreachable.
