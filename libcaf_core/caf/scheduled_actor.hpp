@@ -291,7 +291,7 @@ public:
   }
 
   size_t mailbox_cached_count() const {
-    return const_cast<scheduled_actor*>(this)->mailbox_.size();
+    return mailbox_.last_size();
   }
 #endif
 

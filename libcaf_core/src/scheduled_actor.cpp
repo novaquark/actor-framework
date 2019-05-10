@@ -708,7 +708,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
 #ifdef CAF_ENABLE_INSTRUMENTATION
         auto msgtype = instrumentation::get_msgtype(current_element_->content());
         auto mb_wait_time = caf::timestamp_ago_ns(current_element_->ts);
-        auto mb_size = 0; // mailbox_.size();
+        auto mb_size = mailbox_cached_count(); // WARNING: using size() here can crash.
 #endif
 
       auto call_default_handler = [&] {
@@ -738,7 +738,6 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
         return !skipped ? im_success : im_skipped;
       }
       auto& bhvr = bhvr_stack_.back();
-
       switch (bhvr(visitor, x.content())) {
         default:
 #ifdef CAF_ENABLE_INSTRUMENTATION

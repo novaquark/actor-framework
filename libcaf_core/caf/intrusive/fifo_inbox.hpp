@@ -78,6 +78,11 @@ public:
     return queue_.total_task_size();
   }
 
+  /// Returns an approximation of the current size, but don't fetch_more.
+  size_t last_size() const noexcept {
+    return queue_.total_task_size();
+  }
+
   /// Queries whether the inbox is empty.
   bool empty() const noexcept {
     return queue_.empty() && inbox_.empty();
