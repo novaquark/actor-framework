@@ -82,6 +82,10 @@ msgtype_id get_msgtype(const tuple_type& t) {
   auto type = t.type(0);
   if (type.first == type_nr<atom_value>::value)
     return detail::get(t.template get_as<atom_value>(0));
+  else if (t.size() > 1 && t.type(1).first == type_nr<atom_value>::value)
+  {
+          return detail::get(t.template get_as<atom_value>(1));
+  }
 
   return detail::get_from_pair(type);
 }
