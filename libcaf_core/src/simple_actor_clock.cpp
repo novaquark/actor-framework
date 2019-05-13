@@ -67,6 +67,11 @@ void simple_actor_clock::visitor::operator()(request_timeout& x) {
 }
 
 void simple_actor_clock::visitor::operator()(actor_msg& x) {
+  #ifdef CAF_ENABLE_INSTRUMENTATION
+    if(x.content) {
+      x.content->ts = make_timestamp();
+    }
+  #endif
   x.receiver->enqueue(std::move(x.content), nullptr);
 }
 
