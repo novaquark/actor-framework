@@ -69,13 +69,13 @@ private:
     struct visitor;
     struct set_ordinary_timeout {
       time_point t;
-      abstract_actor* self;
+      weak_actor_ptr self;
       atom_value type;
       uint64_t id;
     };
     struct set_request_timeout {
       time_point t;
-      abstract_actor* self;
+      weak_actor_ptr self;
       message_id id;
     };
     struct cancel_ordinary_timeout {
@@ -83,10 +83,16 @@ private:
       atom_value type;
     };
     struct cancel_request_timeout {
+      // danger here, at the time we process the message, we might have another existing actor at the exact same address.
       abstract_actor* self;
       message_id id;
     };
     struct cancel_timeouts {
+      // that one is called at the time of destruction when an actor dies.
+      // we have a potentially nasty race condition here if the message is processed async
+      // and another actor got the same pointer value.
+      // we can't take a strong reference to the actor because it is being destroyed (more or less)
+      // at the time we get here.
       abstract_actor* self;
     };
 
@@ -105,7 +111,7 @@ private:
 
     struct set_multi_timeout {
       time_point t;
-      abstract_actor* self;
+      weak_actor_ptr self;
       atom_value type;
       uint64_t id;
     };

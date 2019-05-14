@@ -17,7 +17,8 @@
  ******************************************************************************/
 
 #include "caf/detail/thread_safe_actor_clock.hpp"
-#include <iostream>
+#include "caf/actor.hpp"
+#include "caf/actor_cast.hpp"
 
 namespace caf {
 namespace detail {
@@ -48,13 +49,14 @@ void thread_safe_actor_clock::set_ordinary_timeout(time_point t,
                                                    atom_value type,
                                                    uint64_t id) {
 
-  enqueueInvocation(Pouet::set_ordinary_timeout{t, self, type, id});
+  enqueueInvocation(
+    Pouet::set_ordinary_timeout{t, actor_cast<weak_actor_ptr>(self), type, id});
 }
 
 void thread_safe_actor_clock::set_request_timeout(time_point t,
                                                   abstract_actor* self,
                                                   message_id id) {
-  enqueueInvocation(Pouet::set_request_timeout{t, self, id});
+  enqueueInvocation(Pouet::set_request_timeout{t, actor_cast<weak_actor_ptr>(self), id});
 }
 
 void thread_safe_actor_clock::cancel_ordinary_timeout(abstract_actor* self,
@@ -88,7 +90,7 @@ void thread_safe_actor_clock::schedule_message(time_point t, group target,
 void thread_safe_actor_clock::set_multi_timeout(time_point t,
                                                 abstract_actor* self,
                                                 atom_value type, uint64_t id) {
-  enqueueInvocation(Pouet::set_multi_timeout{t, self, type, id});
+  enqueueInvocation(Pouet::set_multi_timeout{t, actor_cast<weak_actor_ptr>(self), type, id});
 }
 
 void thread_safe_actor_clock::cancel_all() {
@@ -99,11 +101,17 @@ struct thread_safe_actor_clock::Pouet::visitor {
   simple_actor_clock& clock;
 
   void operator()(set_ordinary_timeout& v) {
-    clock.set_ordinary_timeout(v.t, v.self, v.type, v.id);
+    if (auto strong = actor_cast<strong_actor_ptr>(v.self)) {
+      clock.set_ordinary_timeout(v.t, actor_cast<abstract_actor*>(strong),
+                                 strong, v.type, v.id);
+    }
   }
 
   void operator()(set_request_timeout& v) {
-    clock.set_request_timeout(v.t, v.self, v.id);
+    if (auto strong = actor_cast<strong_actor_ptr>(v.self)) {
+      clock.set_request_timeout(v.t, actor_cast<abstract_actor*>(strong),
+                                strong, v.id);
+    }
   }
 
   void operator()(cancel_ordinary_timeout& v) {
@@ -128,7 +136,11 @@ struct thread_safe_actor_clock::Pouet::visitor {
   }
 
   void operator()(set_multi_timeout& v) {
-    clock.set_multi_timeout(v.t, v.self, v.type, v.id);
+    if (auto strong = actor_cast<strong_actor_ptr>(v.self)) {
+
+      clock.set_multi_timeout(v.t, actor_cast<abstract_actor*>(strong), strong,
+                              v.type, v.id);
+    }
   }
 
   void operator()(cancel_all&) {
@@ -158,12 +170,13 @@ void thread_safe_actor_clock::run_dispatch_loop() {
     // will take the lock for a very short time.
     pumpMessages();
 
-    std::unique_lock<std::mutex> guard {queue_.mutex};
     if (realClock_.schedule().empty()) {
+      std::unique_lock<std::mutex> guard{queue_.mutex};
       cv_.wait(guard);
     } else {
-      auto tout = realClock_.schedule().begin()->first;
-      cv_.wait_until(guard, tout);
+      auto untilDate = realClock_.schedule().begin()->first;
+      std::unique_lock<std::mutex> guard{queue_.mutex};
+      cv_.wait_until(guard, untilDate);
     }
     // Double-check whether schedule is non-empty and execute it.
     if (!realClock_.schedule().empty()) {
