@@ -32,8 +32,9 @@ thread_safe_actor_clock::thread_safe_actor_clock() : done_(false) {
   // nop
 }
 
-void __attribute__ ((noinline)) thread_safe_actor_clock::enqueueInvocation(Pouet::value_type&& i) {
-  if (!done_.load())
+void __attribute__((noinline))
+thread_safe_actor_clock::enqueueInvocation(Pouet::value_type&& i) {
+  if (done_)
     return;
   {
     guard_type guard{queue_.mutex};
@@ -135,8 +136,7 @@ struct thread_safe_actor_clock::Pouet::visitor {
   }
 };
 
-void __attribute__ ((noinline)) thread_safe_actor_clock::pumpMessages() {
-  // called under the lock
+void __attribute__((noinline)) thread_safe_actor_clock::pumpMessages() {
   Pouet::visitor aVisitor{realClock_};
   {
     // only lock while swapping the buffers.
@@ -153,13 +153,12 @@ void __attribute__ ((noinline)) thread_safe_actor_clock::pumpMessages() {
 
 void thread_safe_actor_clock::run_dispatch_loop() {
   simple_actor_clock::visitor f{&realClock_};
-  guard_type guard{queue_.mutex};
   while (done_ == false) {
-    // Wait for non-empty schedule.
-    // Note: The thread calling run_dispatch_loop() is guaranteed not to lock
-    //       the mutex recursively. Otherwise, cv_.wait() or cv_.wait_until()
-    //       would be unsafe, because wait operations call unlock() only once.
+
+    // will take the lock for a very short time.
     pumpMessages();
+
+    std::unique_lock<std::mutex> guard {queue_.mutex};
     if (realClock_.schedule().empty()) {
       cv_.wait(guard);
     } else {
