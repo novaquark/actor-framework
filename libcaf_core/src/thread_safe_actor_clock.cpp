@@ -34,12 +34,12 @@ thread_safe_actor_clock::thread_safe_actor_clock() : done_(false) {
 }
 
 void __attribute__((noinline))
-thread_safe_actor_clock::enqueueInvocation(Pouet::value_type&& i) {
+thread_safe_actor_clock::enqueueInvocation(Messages::value_type&& i) {
   if (done_)
     return;
   {
-    guard_type guard{queue_.mutex};
-    queue_.messages.push_back(std::move(i));
+    guard_type guard{mutex_};
+    messages_.push_back(std::move(i));
   }
   cv_.notify_all();
 }
@@ -49,55 +49,57 @@ void thread_safe_actor_clock::set_ordinary_timeout(time_point t,
                                                    atom_value type,
                                                    uint64_t id) {
 
-  enqueueInvocation(
-    Pouet::set_ordinary_timeout{t, actor_cast<weak_actor_ptr>(self), type, id});
+  enqueueInvocation(Messages::set_ordinary_timeout{
+    t, actor_cast<weak_actor_ptr>(self), type, id});
 }
 
 void thread_safe_actor_clock::set_request_timeout(time_point t,
                                                   abstract_actor* self,
                                                   message_id id) {
-  enqueueInvocation(Pouet::set_request_timeout{t, actor_cast<weak_actor_ptr>(self), id});
+  enqueueInvocation(
+    Messages::set_request_timeout{t, actor_cast<weak_actor_ptr>(self), id});
 }
 
 void thread_safe_actor_clock::cancel_ordinary_timeout(abstract_actor* self,
                                                       atom_value type) {
-  enqueueInvocation(Pouet::cancel_ordinary_timeout{self, type});
+  enqueueInvocation(Messages::cancel_ordinary_timeout{self, type});
 }
 
 void thread_safe_actor_clock::cancel_request_timeout(abstract_actor* self,
                                                      message_id id) {
-  enqueueInvocation(Pouet::cancel_request_timeout{self, id});
+  enqueueInvocation(Messages::cancel_request_timeout{self, id});
 }
 
 void thread_safe_actor_clock::cancel_timeouts(abstract_actor* self) {
-  enqueueInvocation(Pouet::cancel_timeouts{self});
+  enqueueInvocation(Messages::cancel_timeouts{self});
 }
 
 void thread_safe_actor_clock::schedule_message(time_point t,
                                                strong_actor_ptr receiver,
                                                mailbox_element_ptr content) {
   enqueueInvocation(
-    Pouet::schedule_message{t, std::move(receiver), std::move(content)});
+    Messages::schedule_message{t, std::move(receiver), std::move(content)});
 }
 
 void thread_safe_actor_clock::schedule_message(time_point t, group target,
                                                strong_actor_ptr sender,
                                                message content) {
-  enqueueInvocation(Pouet::schedule_message_group{
+  enqueueInvocation(Messages::schedule_message_group{
     t, std::move(target), std::move(sender), std::move(content)});
 }
 
 void thread_safe_actor_clock::set_multi_timeout(time_point t,
                                                 abstract_actor* self,
                                                 atom_value type, uint64_t id) {
-  enqueueInvocation(Pouet::set_multi_timeout{t, actor_cast<weak_actor_ptr>(self), type, id});
+  enqueueInvocation(
+    Messages::set_multi_timeout{t, actor_cast<weak_actor_ptr>(self), type, id});
 }
 
 void thread_safe_actor_clock::cancel_all() {
-  enqueueInvocation(Pouet::cancel_all{});
+  enqueueInvocation(Messages::cancel_all{});
 }
 
-struct thread_safe_actor_clock::Pouet::visitor {
+struct thread_safe_actor_clock::Messages::visitor {
   simple_actor_clock& clock;
 
   void operator()(set_ordinary_timeout& v) {
@@ -149,18 +151,19 @@ struct thread_safe_actor_clock::Pouet::visitor {
 };
 
 void __attribute__((noinline)) thread_safe_actor_clock::pumpMessages() {
-  Pouet::visitor aVisitor{realClock_};
+  Messages::visitor aVisitor{realClock_};
+  tempBuffer_.clear();
+
   {
     // only lock while swapping the buffers.
-    guard_type guard{queue_.mutex};
-    std::swap(queue_.messages, queue_.tempBuffer);
-    queue_.messages.clear();
+    guard_type guard{mutex_};
+    std::swap(messages_, tempBuffer_);
   }
 
-  for (auto& val : queue_.tempBuffer) {
+  for (auto& val : tempBuffer_) {
     visit(aVisitor, val);
   }
-  queue_.tempBuffer.clear();
+  tempBuffer_.clear();
 }
 
 void thread_safe_actor_clock::run_dispatch_loop() {
@@ -171,11 +174,11 @@ void thread_safe_actor_clock::run_dispatch_loop() {
     pumpMessages();
 
     if (realClock_.schedule().empty()) {
-      std::unique_lock<std::mutex> guard{queue_.mutex};
+      std::unique_lock<std::mutex> guard{mutex_};
       cv_.wait(guard);
     } else {
       auto untilDate = realClock_.schedule().begin()->first;
-      std::unique_lock<std::mutex> guard{queue_.mutex};
+      std::unique_lock<std::mutex> guard{mutex_};
       cv_.wait_until(guard, untilDate);
     }
     // Double-check whether schedule is non-empty and execute it.
@@ -192,7 +195,7 @@ void thread_safe_actor_clock::run_dispatch_loop() {
 }
 
 void thread_safe_actor_clock::cancel_dispatch_loop() {
-  guard_type guard{queue_.mutex};
+  guard_type guard{mutex_};
   done_ = true;
   cv_.notify_all();
 }

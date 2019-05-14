@@ -121,10 +121,11 @@ void simple_actor_clock::set_multi_timeout(time_point t, abstract_actor* self,
 
 void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self,
                                              message_id id) {
-                                              set_request_timeout(t, self, actor_cast<strong_actor_ptr>(self),  id);
-                                             }
+  set_request_timeout(t, self, actor_cast<strong_actor_ptr>(self), id);
+}
 
-void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self, strong_actor_ptr sptr,
+void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self,
+                                             strong_actor_ptr sptr,
                                              message_id id) {
 
   request_predicate pred{id};

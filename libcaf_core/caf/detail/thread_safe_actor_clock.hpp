@@ -65,7 +65,7 @@ public:
   void cancel_dispatch_loop();
 
 private:
-  struct Pouet {
+  struct Messages {
     struct visitor;
     struct set_ordinary_timeout {
       time_point t;
@@ -83,16 +83,24 @@ private:
       atom_value type;
     };
     struct cancel_request_timeout {
-      // danger here, at the time we process the message, we might have another existing actor at the exact same address.
+      // danger here, at the time we process the message, we might have another
+      // existing actor at the exact same address.
       abstract_actor* self;
       message_id id;
     };
     struct cancel_timeouts {
       // that one is called at the time of destruction when an actor dies.
-      // we have a potentially nasty race condition here if the message is processed async
-      // and another actor got the same pointer value.
-      // we can't take a strong reference to the actor because it is being destroyed (more or less)
-      // at the time we get here.
+      // we have a potentially nasty race condition here if the message is
+      // processed async and another actor got the same pointer value. we can't
+      // take a strong reference to the actor because it is being destroyed
+      // (more or less) at the time we get here. the good news, is that we
+      // probably don't have any issue in practice. cancel_timeouts is scheduled
+      // *before* the pointer is freed. any subsequent timers processed by
+      // another occurrence of an actor at the same address would be enqued
+      // *after* the processing of the cancel_timeouts. So, if we preserve the
+      // ordering (which is the case), we are safe. this forbids smarter
+      // implementations that would keep a list of messages for the actor clock
+      // using the thread local storage.
       abstract_actor* self;
     };
 
@@ -121,19 +129,21 @@ private:
     using value_type =
       variant<set_ordinary_timeout, set_request_timeout,
               cancel_ordinary_timeout, cancel_request_timeout, cancel_timeouts,
-              schedule_message, schedule_message_group, set_multi_timeout, cancel_all>;
+              schedule_message, schedule_message_group, set_multi_timeout,
+              cancel_all>;
   };
 
-  struct TLSQueue {
-    std::mutex mutex;
-    std::vector<Pouet::value_type> messages;
-    std::vector<Pouet::value_type> tempBuffer; // for hotswap
-  };
-
-  void enqueueInvocation(Pouet::value_type&&);
+  void enqueueInvocation(Messages::value_type&&);
   void pumpMessages();
-  TLSQueue queue_;
+
   std::condition_variable cv_;
+  std::mutex mutex_;
+
+  // concurrent access, must be protected by the mutex
+  std::vector<Messages::value_type> messages_;
+
+  // buffer only accessed from the caf actor thread. for hotswap with [messages]
+  std::vector<Messages::value_type> tempBuffer_; 
 
   std::atomic<bool> done_;
   simple_actor_clock realClock_;
