@@ -126,10 +126,8 @@ private:
 
   void enqueueInvocation(Pouet::value_type&&);
   void pumpMessages();
-  static constexpr int MaxThread = 50;
-  std::array<TLSQueue, MaxThread> kaouest_;
+  TLSQueue queue_;
   std::condition_variable cv_;
-  std::mutex mx_;
 
   std::atomic<bool> done_;
   simple_actor_clock realClock_;

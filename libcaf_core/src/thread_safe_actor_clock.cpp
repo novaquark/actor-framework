@@ -17,6 +17,7 @@
  ******************************************************************************/
 
 #include "caf/detail/thread_safe_actor_clock.hpp"
+#include <iostream>
 
 namespace caf {
 namespace detail {
@@ -31,27 +32,14 @@ thread_safe_actor_clock::thread_safe_actor_clock() : done_(false) {
   // nop
 }
 
-// only accessed under a lock, but in theory several instance might be used
-// TODO: clean that
-static std::atomic<int> maxThreadIndex;
-
-static thread_local int currentThreadIndex = -1;
-
-void thread_safe_actor_clock::enqueueInvocation(Pouet::value_type&& i) {
-  if (currentThreadIndex <= 0) {
-    currentThreadIndex = maxThreadIndex++;
-    CAF_ASSERT(currentThreadIndex < MaxThread);
-  }
+void __attribute__ ((noinline)) thread_safe_actor_clock::enqueueInvocation(Pouet::value_type&& i) {
+  if (!done_.load())
+    return;
   {
-    TLSQueue& queue = kaouest_[currentThreadIndex];
-    guard_type guard{queue.mutex};
-    queue.messages.push_back(std::move(i));
+    guard_type guard{queue_.mutex};
+    queue_.messages.push_back(std::move(i));
   }
-  {
-    // lock or not lock
-    // there is a race condition if we don't take the lock.
-    cv_.notify_all();
-  }
+  cv_.notify_all();
 }
 
 void thread_safe_actor_clock::set_ordinary_timeout(time_point t,
@@ -147,30 +135,25 @@ struct thread_safe_actor_clock::Pouet::visitor {
   }
 };
 
-void thread_safe_actor_clock::pumpMessages() {
+void __attribute__ ((noinline)) thread_safe_actor_clock::pumpMessages() {
   // called under the lock
-  int currentMax = maxThreadIndex.load();
   Pouet::visitor aVisitor{realClock_};
-  for (int i = 0; i < currentMax; ++i) {
-    // this loop might be a bit expansive, find a way to cut it.
-    TLSQueue& queue = kaouest_.at(i);
-    {
-      // only lock while swapping the buffers.
-      guard_type guard{queue.mutex};
-      std::swap(queue.messages, queue.tempBuffer);
-      queue.messages.clear();
-    }
-
-    for (auto& val : queue.tempBuffer) {
-      visit(aVisitor, val);
-    }
-    queue.tempBuffer.clear();
+  {
+    // only lock while swapping the buffers.
+    guard_type guard{queue_.mutex};
+    std::swap(queue_.messages, queue_.tempBuffer);
+    queue_.messages.clear();
   }
+
+  for (auto& val : queue_.tempBuffer) {
+    visit(aVisitor, val);
+  }
+  queue_.tempBuffer.clear();
 }
 
 void thread_safe_actor_clock::run_dispatch_loop() {
   simple_actor_clock::visitor f{&realClock_};
-  guard_type guard{mx_};
+  guard_type guard{queue_.mutex};
   while (done_ == false) {
     // Wait for non-empty schedule.
     // Note: The thread calling run_dispatch_loop() is guaranteed not to lock
@@ -197,7 +180,7 @@ void thread_safe_actor_clock::run_dispatch_loop() {
 }
 
 void thread_safe_actor_clock::cancel_dispatch_loop() {
-  guard_type guard{mx_};
+  guard_type guard{queue_.mutex};
   done_ = true;
   cv_.notify_all();
 }
