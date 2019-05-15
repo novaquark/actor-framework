@@ -20,6 +20,8 @@
 #include "caf/actor.hpp"
 #include "caf/actor_cast.hpp"
 
+#include <iostream>
+
 namespace caf {
 namespace detail {
 
@@ -39,7 +41,14 @@ thread_safe_actor_clock::enqueueInvocation(Messages::value_type&& i) {
     return;
   {
     guard_type guard{mutex_};
+    size_t cap = messages_.capacity();
     messages_.push_back(std::move(i));
+    size_t newCap = messages_.capacity();
+    if (cap != newCap) {
+      std::cerr << "cap " << cap << " -> "
+                << " newcap " << newCap << " size " << messages_.size()
+                << std::endl;
+    }
   }
   cv_.notify_all();
 }
@@ -160,10 +169,23 @@ void __attribute__((noinline)) thread_safe_actor_clock::pumpMessages() {
     std::swap(messages_, tempBuffer_);
   }
 
+  auto s = tempBuffer_.size();
+  auto t = now();
+
+  std::cerr << "start pumping " << s << " messages" << std::endl;
+
   for (auto& val : tempBuffer_) {
     visit(aVisitor, val);
   }
   tempBuffer_.clear();
+
+  if (s > 0) {
+    std::cerr << "did pump " << s << " in "
+              << std::chrono::duration_cast<std::chrono::duration<double>>(now()
+                                                                           - t)
+                   .count()
+              << " s" << std::endl;
+  }
 }
 
 void thread_safe_actor_clock::run_dispatch_loop() {
@@ -181,13 +203,26 @@ void thread_safe_actor_clock::run_dispatch_loop() {
       std::unique_lock<std::mutex> guard{mutex_};
       cv_.wait_until(guard, untilDate);
     }
+
+    std::cerr << "will process" << std::endl;
     // Double-check whether schedule is non-empty and execute it.
     if (!realClock_.schedule().empty()) {
       auto t = now();
+      int count = 0;
       auto i = realClock_.schedule().begin();
       while (i != realClock_.schedule().end() && i->first <= t) {
         visit(f, i->second);
         i = realClock_.schedule().erase(i);
+        count++;
+      }
+
+      if (true) {
+        std::cerr << "did process " << count << " events in "
+                  << std::chrono::duration_cast<std::chrono::duration<double>>(
+                       now() - t)
+                       .count()
+                  << " from " << realClock_.schedule().size() << " entries"
+                  << std::endl;
       }
     }
   }
