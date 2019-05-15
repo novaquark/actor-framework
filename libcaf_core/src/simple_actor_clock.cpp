@@ -26,19 +26,19 @@ namespace caf {
 namespace detail {
 
 bool simple_actor_clock::ordinary_predicate::
-operator()(const secondary_map::value_type& x) const noexcept {
+operator()(const actor_timers::map::value_type& x) const noexcept {
   auto ptr = get_if<ordinary_timeout>(&x.second->second);
   return ptr != nullptr ? ptr->type == type : false;
 }
 
 bool simple_actor_clock::multi_predicate::
-operator()(const secondary_map::value_type& x) const noexcept {
+operator()(const actor_timers::map::value_type& x) const noexcept {
   auto ptr = get_if<multi_timeout>(&x.second->second);
   return ptr != nullptr ? ptr->type == type : false;
 }
 
 bool simple_actor_clock::request_predicate::
-operator()(const secondary_map::value_type& x) const noexcept {
+operator()(const actor_timers::map::value_type& x) const noexcept {
   auto ptr = get_if<request_timeout>(&x.second->second);
   return ptr != nullptr ? ptr->id == id : false;
 }
@@ -86,21 +86,22 @@ void simple_actor_clock::set_ordinary_timeout(time_point t, abstract_actor* self
   auto i = lookup(self, pred);
   auto sptr = actor_cast<strong_actor_ptr>(self);
   ordinary_timeout tmp{std::move(sptr), type, id};
-  if (i != actor_lookup_.end()) {
-    schedule_.erase(i->second);
-    i->second = schedule_.emplace(t, std::move(tmp));
+  if (i) {
+    schedule_.erase(i.timer_it->second);
+    i.timer_it->second = schedule_.emplace(t, std::move(tmp));
   } else {
     auto j = schedule_.emplace(t, std::move(tmp));
-    actor_lookup_.emplace(self, j);
+    add_actor_timer(i, self, pred, j);
   }
 }
 
 void simple_actor_clock::set_multi_timeout(time_point t, abstract_actor* self,
                                            atom_value type, uint64_t id) {
   auto sptr = actor_cast<strong_actor_ptr>(self);
+  multi_predicate pred{type};
   multi_timeout tmp{std::move(sptr), type, id};
   auto j = schedule_.emplace(t, std::move(tmp));
-  actor_lookup_.emplace(self, j);
+  add_actor_timer(self, pred, j);
 }
 
 void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self,
@@ -109,12 +110,12 @@ void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self,
   auto i = lookup(self, pred);
   auto sptr = actor_cast<strong_actor_ptr>(self);
   request_timeout tmp{std::move(sptr), id};
-  if (i != actor_lookup_.end()) {
-    schedule_.erase(i->second);
-    i->second = schedule_.emplace(t, std::move(tmp));
+  if (i) {
+    schedule_.erase(i.timer_it->second);
+    i.timer_it->second = schedule_.emplace(t, std::move(tmp));
   } else {
     auto j = schedule_.emplace(t, std::move(tmp));
-    actor_lookup_.emplace(self, j);
+    add_actor_timer(i, self, pred, j);
   }
 }
 
@@ -131,12 +132,17 @@ void simple_actor_clock::cancel_request_timeout(abstract_actor* self,
 }
 
 void simple_actor_clock::cancel_timeouts(abstract_actor* self) {
-  auto range = actor_lookup_.equal_range(self);
-  if (range.first == range.second)
+  auto it = actor_lookup_.find(self);
+  if (it == actor_lookup_.end())
     return;
-  for (auto i = range.first; i != range.second; ++i)
-    schedule_.erase(i->second);
-  actor_lookup_.erase(range.first, range.second);
+
+  actor_timers& actor_bucket = it->second;
+
+  for (const auto& pair : actor_bucket.timersByToken) {
+    schedule_.erase(pair.second);
+  }
+
+  actor_lookup_.erase(it);
 }
 
 void simple_actor_clock::schedule_message(time_point t,
