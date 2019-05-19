@@ -37,7 +37,7 @@ public:
                            atom_value type, uint64_t id) override;
 
   void set_request_timeout(time_point t, abstract_actor* self,
-                           message_id id) override;
+                           message_id id) override __attribute__ ((noiinline)) ;
 
   void cancel_ordinary_timeout(abstract_actor* self, atom_value type) override;
 
