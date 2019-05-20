@@ -140,14 +140,24 @@ public:
     void operator()(group_msg& x);
   };
 
-  void set_ordinary_timeout(time_point t, abstract_actor* self,
-                            atom_value type, uint64_t id) override;
-
-  void set_multi_timeout(time_point t, abstract_actor* self,
-                         atom_value type, uint64_t id) override;
-
+protected:
+  void set_ordinary_timeout(time_point t, abstract_actor* self, atom_value type,
+                            uint64_t id) override;
+  void set_multi_timeout(time_point t, abstract_actor* self, atom_value type,
+                         uint64_t id) override;
   void set_request_timeout(time_point t, abstract_actor* self,
                            message_id id) override;
+
+public:
+  void set_ordinary_timeout(time_point t, abstract_actor* self,
+                            strong_actor_ptr sptr, atom_value type,
+                            uint64_t id);
+
+  void set_multi_timeout(time_point t, abstract_actor* self,
+                         strong_actor_ptr sptr, atom_value type, uint64_t id);
+
+  void set_request_timeout(time_point t, abstract_actor* self,
+                           strong_actor_ptr sptr, message_id id);
 
   void cancel_ordinary_timeout(abstract_actor* self, atom_value type) override;
 
@@ -164,6 +174,10 @@ public:
   void cancel_all() override;
 
   inline const map_type& schedule() const {
+    return schedule_;
+  }
+
+  inline map_type& schedule() {
     return schedule_;
   }
 
@@ -272,4 +286,3 @@ protected:
 
 } // namespace detail
 } // namespace caf
-

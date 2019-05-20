@@ -18,6 +18,7 @@
 
 #include "caf/detail/simple_actor_clock.hpp"
 
+#include "caf/actor.hpp"
 #include "caf/actor_cast.hpp"
 #include "caf/sec.hpp"
 #include "caf/system_messages.hpp"
@@ -67,11 +68,11 @@ void simple_actor_clock::visitor::operator()(request_timeout& x) {
 }
 
 void simple_actor_clock::visitor::operator()(actor_msg& x) {
-  #ifdef CAF_ENABLE_INSTRUMENTATION
-    if(x.content) {
-      x.content->ts = make_timestamp();
-    }
-  #endif
+#ifdef CAF_ENABLE_INSTRUMENTATION
+  if (x.content) {
+    x.content->ts = make_timestamp();
+  }
+#endif
   x.receiver->enqueue(std::move(x.content), nullptr);
 }
 
@@ -80,11 +81,19 @@ void simple_actor_clock::visitor::operator()(group_msg& x) {
                     std::move(x.content));
 }
 
-void simple_actor_clock::set_ordinary_timeout(time_point t, abstract_actor* self,
+void simple_actor_clock::set_ordinary_timeout(time_point t,
+                                              abstract_actor* self,
                                               atom_value type, uint64_t id) {
+  set_ordinary_timeout(t, self, actor_cast<strong_actor_ptr>(self), type, id);
+}
+
+void simple_actor_clock::set_ordinary_timeout(time_point t,
+                                              abstract_actor* self,
+                                              strong_actor_ptr sptr,
+                                              atom_value type, uint64_t id) {
+
   ordinary_predicate pred{type};
   auto i = lookup(self, pred);
-  auto sptr = actor_cast<strong_actor_ptr>(self);
   ordinary_timeout tmp{std::move(sptr), type, id};
   if (i) {
     schedule_.erase(i.timer_it->second);
@@ -97,7 +106,13 @@ void simple_actor_clock::set_ordinary_timeout(time_point t, abstract_actor* self
 
 void simple_actor_clock::set_multi_timeout(time_point t, abstract_actor* self,
                                            atom_value type, uint64_t id) {
-  auto sptr = actor_cast<strong_actor_ptr>(self);
+  set_multi_timeout(t, self, actor_cast<strong_actor_ptr>(self), type, id);
+}
+
+void simple_actor_clock::set_multi_timeout(time_point t, abstract_actor* self,
+                                           strong_actor_ptr sptr,
+                                           atom_value type, uint64_t id) {
+
   multi_predicate pred{type};
   multi_timeout tmp{std::move(sptr), type, id};
   auto j = schedule_.emplace(t, std::move(tmp));
@@ -106,9 +121,15 @@ void simple_actor_clock::set_multi_timeout(time_point t, abstract_actor* self,
 
 void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self,
                                              message_id id) {
+  set_request_timeout(t, self, actor_cast<strong_actor_ptr>(self), id);
+}
+
+void simple_actor_clock::set_request_timeout(time_point t, abstract_actor* self,
+                                             strong_actor_ptr sptr,
+                                             message_id id) {
+
   request_predicate pred{id};
   auto i = lookup(self, pred);
-  auto sptr = actor_cast<strong_actor_ptr>(self);
   request_timeout tmp{std::move(sptr), id};
   if (i) {
     schedule_.erase(i.timer_it->second);
