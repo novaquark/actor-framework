@@ -154,11 +154,9 @@ void __attribute__((noinline)) thread_safe_actor_clock::pumpMessages() {
   Messages::visitor aVisitor{realClock_};
   tempBuffer_.clear();
 
-  {
-    // only lock while swapping the buffers.
-    guard_type guard{mutex_};
-    std::swap(messages_, tempBuffer_);
-  }
+  // only lock while swapping the buffers.
+  guard_type guard{mutex_};
+  std::swap(messages_, tempBuffer_);
 
   for (auto& val : tempBuffer_) {
     visit(aVisitor, val);
