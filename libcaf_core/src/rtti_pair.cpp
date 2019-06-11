@@ -5,7 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright 2011-2018 Dominik Charousset                                     *
+ * Copyright 2011-2019 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -16,15 +16,17 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#pragma once
+#include "caf/rtti_pair.hpp"
 
 namespace caf {
 
-/// Tag type to select the unsafe constructor of actor handles.
-struct unsafe_actor_handle_init_t { };
-
-static constexpr unsafe_actor_handle_init_t unsafe_actor_handle_init
-  = unsafe_actor_handle_init_t{};
+std::string to_string(rtti_pair x) {
+  std::string result = "(";
+  result += std::to_string(x.first);
+  result += ", ";
+  result += x.second != nullptr ? x.second->name() : "<null>";
+  result += ")";
+  return result;
+}
 
 } // namespace caf
-

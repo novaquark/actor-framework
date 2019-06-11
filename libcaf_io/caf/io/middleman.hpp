@@ -23,12 +23,13 @@
 #include <memory>
 #include <thread>
 
-#include "caf/fwd.hpp"
-#include "caf/send.hpp"
-#include "caf/node_id.hpp"
-#include "caf/expected.hpp"
 #include "caf/actor_system.hpp"
+#include "caf/detail/unique_function.hpp"
+#include "caf/expected.hpp"
+#include "caf/fwd.hpp"
+#include "caf/node_id.hpp"
 #include "caf/proxy_registry.hpp"
+#include "caf/send.hpp"
 
 #include "caf/instrumentation/broker_stats.hpp"
 
@@ -77,22 +78,6 @@ public:
                    system().message_types(tk), port, in, reuse);
   }
 
-  /// Tries to publish `whom` at `port` and returns either an
-  /// `error` or the bound port.
-  /// @param whom Actor that should be published at `port`.
-  /// @param port Unused UDP port.
-  /// @param in The IP address to listen to or `INADDR_ANY` if `in == nullptr`.
-  /// @param reuse Create socket using `SO_REUSEADDR`.
-  /// @returns The actual port the OS uses after `bind()`. If `port == 0`
-  ///          the OS chooses a random high-level port.
-  template <class Handle>
-  expected<uint16_t> publish_udp(Handle&& whom, uint16_t port,
-                                 const char* in = nullptr, bool reuse = false) {
-    detail::type_list<typename std::decay<Handle>::type> tk;
-    return publish_udp(actor_cast<strong_actor_ptr>(std::forward<Handle>(whom)),
-                       system().message_types(tk), port, in, reuse);
-  }
-
   /// Makes *all* local groups accessible via network
   /// on address `addr` and `port`.
   /// @returns The actual port the OS uses after `bind()`. If `port == 0`
@@ -109,14 +94,6 @@ public:
     return unpublish(whom.address(), port);
   }
 
-  /// Unpublishes `whom` by closing `port` or all assigned ports if `port == 0`.
-  /// @param whom Actor that should be unpublished at `port`.
-  /// @param port UDP port.
-  template <class Handle>
-  expected<void> unpublish_udp(const Handle& whom, uint16_t port = 0) {
-    return unpublish_udp(whom.address(), port);
-  }
-
   /// Establish a new connection to the actor at `host` on given `port`.
   /// @param host Valid hostname or IP address.
   /// @param port TCP port.
@@ -126,21 +103,6 @@ public:
   expected<ActorHandle> remote_actor(std::string host, uint16_t port) {
     detail::type_list<ActorHandle> tk;
     auto x = remote_actor(system().message_types(tk), std::move(host), port);
-    if (!x)
-      return x.error();
-    CAF_ASSERT(x && *x);
-    return actor_cast<ActorHandle>(std::move(*x));
-  }
-
-  /// Contacts the actor at `host` on given `port`.
-  /// @param host Valid hostname or IP address.
-  /// @param port UDP port.
-  /// @returns An `actor` to the proxy instance representing
-  ///          a remote actor or an `error`.
-  template <class ActorHandle = actor>
-  expected<ActorHandle> remote_actor_udp(std::string host, uint16_t port) {
-    detail::type_list<ActorHandle> tk;
-    auto x = remote_actor_udp(system().message_types(tk), std::move(host), port);
     if (!x)
       return x.error();
     CAF_ASSERT(x && *x);
@@ -257,8 +219,14 @@ public:
             class F = std::function<void(broker*)>, class... Ts>
   typename infer_handle_from_fun<F>::type
   spawn_broker(F fun, Ts&&... xs) {
+    using impl = infer_impl_from_fun_t<F>;
+    static constexpr bool spawnable = detail::spawnable<F, impl, Ts...>();
+    static_assert(spawnable,
+                  "cannot spawn function-based broker with given arguments");
     actor_config cfg{&backend()};
-    return system().spawn_functor<Os>(cfg, fun, std::forward<Ts>(xs)...);
+    detail::bool_token<spawnable> enabled;
+    return system().spawn_functor<Os>(enabled, cfg, fun,
+                                      std::forward<Ts>(xs)...);
   }
 
   /// Returns a new functor-based broker connected
@@ -336,11 +304,11 @@ private:
     CAF_ASSERT(ptr != nullptr);
     detail::init_fun_factory<Impl, F> fac;
     actor_config cfg{&backend()};
-    auto init_fun = fac(std::move(fun), ptr->hdl(), std::forward<Ts>(xs)...);
-    cfg.init_fun = [ptr, init_fun](local_actor* self) mutable -> behavior {
+    auto fptr = fac.make(std::move(fun), ptr->hdl(), std::forward<Ts>(xs)...);
+    fptr->hook([=](local_actor* self) mutable {
       static_cast<abstract_broker*>(self)->add_scribe(std::move(ptr));
-      return init_fun(self);
-    };
+    });
+    cfg.init_fun.assign(fptr.release());
     return system().spawn_class<Impl, Os>(cfg);
   }
 
@@ -352,13 +320,13 @@ private:
       return eptr.error();
     auto ptr = std::move(*eptr);
     detail::init_fun_factory<Impl, F> fac;
-    auto init_fun = fac(std::move(fun), std::forward<Ts>(xs)...);
     port = ptr->port();
-    actor_config cfg{&backend()};
-    cfg.init_fun = [ptr, init_fun](local_actor* self) mutable -> behavior {
+    auto fptr = fac.make(std::move(fun), std::forward<Ts>(xs)...);
+    fptr->hook([=](local_actor* self) mutable {
       static_cast<abstract_broker*>(self)->add_doorman(std::move(ptr));
-      return init_fun(self);
-    };
+    });
+    actor_config cfg{&backend()};
+    cfg.init_fun.assign(fptr.release());
     return system().spawn_class<Impl, Os>(cfg);
   }
 
@@ -371,19 +339,10 @@ private:
                              std::set<std::string> sigs,
                              uint16_t port, const char* cstr, bool ru);
 
-  expected<uint16_t> publish_udp(const strong_actor_ptr& whom,
-                                 std::set<std::string> sigs,
-                                 uint16_t port, const char* cstr, bool ru);
-
   expected<void> unpublish(const actor_addr& whom, uint16_t port);
-
-  expected<void> unpublish_udp(const actor_addr& whom, uint16_t port);
 
   expected<strong_actor_ptr> remote_actor(std::set<std::string> ifs,
                                           std::string host, uint16_t port);
-
-  expected<strong_actor_ptr> remote_actor_udp(std::set<std::string> ifs,
-                                              std::string host, uint16_t port);
 
   static int exec_slave_mode(actor_system&, const actor_system_config&);
 

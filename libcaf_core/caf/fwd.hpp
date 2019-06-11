@@ -88,6 +88,8 @@ class actor_registry;
 class actor_system;
 class actor_system_config;
 class behavior;
+class binary_deserializer;
+class binary_serializer;
 class blocking_actor;
 class config_option;
 class config_option_adder;
@@ -132,6 +134,10 @@ class uniform_type_info_map;
 class uri;
 class uri_builder;
 
+// -- templates with default parameters ----------------------------------------
+
+template <class, class = event_based_actor> class stateful_actor;
+
 // -- structs ------------------------------------------------------------------
 
 struct unit_t;
@@ -170,12 +176,12 @@ using ip_address = ipv6_address;
 using ip_subnet = ipv6_subnet;
 using stream_slot = uint16_t;
 
-using config_value_map = dictionary<dictionary<config_value>>;
+using settings = dictionary<config_value>;
 
 // -- functions ----------------------------------------------------------------
 
 /// @relates actor_system_config
-const dictionary<dictionary<config_value>>& content(const actor_system_config&);
+const settings& content(const actor_system_config&);
 
 // -- intrusive containers -----------------------------------------------------
 

@@ -28,9 +28,11 @@
 #include <unordered_map>
 
 #include "caf/abstract_actor.hpp"
+#include "caf/atom.hpp"
 #include "caf/config.hpp"
 #include "caf/deep_to_string.hpp"
 #include "caf/detail/arg_wrapper.hpp"
+#include "caf/detail/log_level.hpp"
 #include "caf/detail/pretty_type_name.hpp"
 #include "caf/detail/ringbuffer.hpp"
 #include "caf/detail/scope_guard.hpp"
@@ -112,7 +114,7 @@ public:
 
     event& operator=(const event&) = default;
 
-    event(unsigned lvl, unsigned line, string_view cat, string_view full_fun,
+    event(unsigned lvl, unsigned line, atom_value cat, string_view full_fun,
           string_view fun, string_view fn, std::string msg, std::thread::id t,
           actor_id a, timestamp ts);
 
@@ -125,7 +127,7 @@ public:
     unsigned line_number;
 
     /// Name of the category (component) logging the event.
-    string_view category_name;
+    atom_value category_name;
 
     /// Name of the current function as reported by `__PRETTY_FUNCTION__`.
     string_view pretty_fun;
@@ -258,7 +260,7 @@ public:
 
   /// Returns whether the logger is configured to accept input for given
   /// component and log level.
-  bool accepts(unsigned level, string_view component_name);
+  bool accepts(unsigned level, atom_value component_name);
 
   /// Returns the output format used for the log file.
   const line_format& file_format() const {
@@ -349,6 +351,8 @@ private:
 
   void init(actor_system_config& cfg);
 
+  bool open_file();
+
   // -- event handling ---------------------------------------------------------
 
   void handle_event(const event& x);
@@ -375,7 +379,7 @@ private:
   config cfg_;
 
   // Filters events by component name.
-  std::string component_filter;
+  std::vector<atom_value> component_blacklist;
 
   // References the parent system.
   actor_system& system_;
@@ -403,6 +407,9 @@ private:
 
   // Filled with log events by other threads.
   detail::ringbuffer<event, queue_size> queue_;
+
+  // Stores the assembled name of the log file.
+  std::string file_name_;
 
   // Executes `logger::run`.
   std::thread thread_;
@@ -446,7 +453,7 @@ bool operator==(const logger::field& x, const logger::field& y);
 
 #define CAF_LOG_MAKE_EVENT(aid, component, loglvl, message)                    \
   ::caf::logger::event {                                                       \
-    loglvl, __LINE__, component, CAF_PRETTY_FUN, __func__,                     \
+    loglvl, __LINE__, caf::atom(component), CAF_PRETTY_FUN, __func__,          \
       caf::logger::skip_path(__FILE__),                                        \
       (::caf::logger::line_builder{} << message).get(),                        \
       ::std::this_thread::get_id(), aid, ::caf::make_timestamp()               \
@@ -464,30 +471,11 @@ bool operator==(const logger::field& x, const logger::field& y);
 
 // -- logging macros -----------------------------------------------------------
 
-#if CAF_LOG_LEVEL == CAF_LOG_LEVEL_QUIET
-
-#define CAF_LOG_IMPL(unused1, unused2, unused3)
-
-// placeholder macros when compiling without logging
-inline caf::actor_id caf_set_aid_dummy() { return 0; }
-
-#define CAF_PUSH_AID(unused) CAF_VOID_STMT
-
-#define CAF_PUSH_AID_FROM_PTR(unused) CAF_VOID_STMT
-
-#define CAF_SET_AID(unused) caf_set_aid_dummy()
-
-#define CAF_SET_LOGGER_SYS(unused) CAF_VOID_STMT
-
-#define CAF_LOG_TRACE(unused)
-
-#else // CAF_LOG_LEVEL == CAF_LOG_LEVEL_QUIET
-
 #define CAF_LOG_IMPL(component, loglvl, message)                               \
   do {                                                                         \
     auto CAF_UNIFYN(caf_logger) = caf::logger::current_logger();               \
     if (CAF_UNIFYN(caf_logger) != nullptr                                      \
-        && CAF_UNIFYN(caf_logger)->accepts(loglvl, component))                 \
+        && CAF_UNIFYN(caf_logger)->accepts(loglvl, caf::atom(component)))      \
       CAF_UNIFYN(caf_logger)                                                   \
         ->log(CAF_LOG_MAKE_EVENT(CAF_UNIFYN(caf_logger)->thread_local_aid(),   \
                                  component, loglvl, message));                 \
@@ -547,8 +535,6 @@ inline caf::actor_id caf_set_aid_dummy() { return 0; }
 #define CAF_LOG_ERROR(output)                                                  \
   CAF_LOG_IMPL(CAF_LOG_COMPONENT, CAF_LOG_LEVEL_ERROR, output)
 
-#endif // CAF_LOG_LEVEL == CAF_LOG_LEVEL_QUIET
-
 #ifndef CAF_LOG_INFO
 #define CAF_LOG_INFO(output) CAF_VOID_STMT
 #define CAF_LOG_INFO_IF(cond, output) CAF_VOID_STMT
@@ -593,7 +579,9 @@ inline caf::actor_id caf_set_aid_dummy() { return 0; }
 
 /// The log component responsible for logging control flow events that are
 /// crucial for understanding happens-before relations. See RFC SE-0001.
-#define CAF_LOG_FLOW_COMPONENT "caf.flow"
+#define CAF_LOG_FLOW_COMPONENT "caf_flow"
+
+#if CAF_LOG_LEVEL >= CAF_LOG_LEVEL_DEBUG
 
 #define CAF_LOG_SPAWN_EVENT(ref, ctor_data)                                    \
   CAF_LOG_IMPL(CAF_LOG_FLOW_COMPONENT, CAF_LOG_LEVEL_DEBUG,                    \
@@ -642,3 +630,42 @@ inline caf::actor_id caf_set_aid_dummy() { return 0; }
                "TERMINATE ; ID =" << thisptr->id()                             \
                  << "; REASON =" << deep_to_string(rsn).c_str()                \
                  << "; NODE =" << thisptr->node())
+
+#else // CAF_LOG_LEVEL >= CAF_LOG_LEVEL_DEBUG
+
+#define CAF_LOG_SPAWN_EVENT(ref, ctor_data) CAF_VOID_STMT
+
+#define CAF_LOG_SEND_EVENT(ptr) CAF_VOID_STMT
+
+#define CAF_LOG_RECEIVE_EVENT(ptr) CAF_VOID_STMT
+
+#define CAF_LOG_REJECT_EVENT() CAF_VOID_STMT
+
+#define CAF_LOG_ACCEPT_EVENT(unblocked) CAF_VOID_STMT
+
+#define CAF_LOG_DROP_EVENT() CAF_VOID_STMT
+
+#define CAF_LOG_SKIP_EVENT() CAF_VOID_STMT
+
+#define CAF_LOG_FINALIZE_EVENT() CAF_VOID_STMT
+
+#define CAF_LOG_TERMINATE_EVENT(thisptr, rsn) CAF_VOID_STMT
+
+#endif // CAF_LOG_LEVEL >= CAF_LOG_LEVEL_DEBUG
+
+// -- macros for logging streaming-related events ------------------------------
+
+/// The log component for logging streaming-related events that are crucial for
+/// understanding handshaking, credit decisions, etc.
+#define CAF_LOG_STREAM_COMPONENT "caf_stream"
+
+#if CAF_LOG_LEVEL >= CAF_LOG_LEVEL_DEBUG
+#define CAF_STREAM_LOG_DEBUG(output)                                           \
+  CAF_LOG_IMPL(CAF_LOG_STREAM_COMPONENT, CAF_LOG_LEVEL_DEBUG, output)
+#define CAF_STREAM_LOG_DEBUG_IF(condition, output)                             \
+  if (condition)                                                               \
+    CAF_LOG_IMPL(CAF_LOG_STREAM_COMPONENT, CAF_LOG_LEVEL_DEBUG, output)
+#else
+#define CAF_STREAM_LOG_DEBUG(unused) CAF_VOID_STMT
+#define CAF_STREAM_LOG_DEBUG_IF(unused1, unused2) CAF_VOID_STMT
+#endif

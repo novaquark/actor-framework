@@ -34,6 +34,9 @@
 #include "caf/behavior.hpp"
 #include "caf/check_typed_input.hpp"
 #include "caf/delegated.hpp"
+#include "caf/detail/type_traits.hpp"
+#include "caf/detail/typed_actor_util.hpp"
+#include "caf/detail/unique_function.hpp"
 #include "caf/duration.hpp"
 #include "caf/error.hpp"
 #include "caf/fwd.hpp"
@@ -48,8 +51,6 @@
 #include "caf/spawn_options.hpp"
 #include "caf/typed_actor.hpp"
 #include "caf/typed_response_promise.hpp"
-
-#include "caf/detail/typed_actor_util.hpp"
 
 namespace caf {
 
@@ -88,7 +89,7 @@ public:
   // -- timeout management -----------------------------------------------------
 
   /// Requests a new timeout for `mid`.
-  /// @pre `mid.valid()`
+  /// @pre `mid.is_request()`
   void request_response_timeout(const duration& d, message_id mid);
 
   // -- spawn functions --------------------------------------------------------
@@ -109,9 +110,16 @@ public:
 
   template <spawn_options Os = no_spawn_options, class F, class... Ts>
   infer_handle_from_fun_t<F> spawn(F fun, Ts&&... xs) {
+    using impl = infer_impl_from_fun_t<F>;
+    static constexpr bool spawnable = detail::spawnable<F, impl, Ts...>();
+    static_assert(spawnable,
+                  "cannot spawn function-based actor with given arguments");
     actor_config cfg{context()};
-    return eval_opts(Os, system().spawn_functor<make_unbound(Os)>(
-                           cfg, fun, std::forward<Ts>(xs)...));
+    static constexpr spawn_options unbound = make_unbound(Os);
+    detail::bool_token<spawnable> enabled;
+    return eval_opts(Os,
+                     system().spawn_functor<unbound>(enabled, cfg, fun,
+                                                     std::forward<Ts>(xs)...));
   }
 
   template <class T, spawn_options Os = no_spawn_options, class Groups,
@@ -192,8 +200,7 @@ public:
 
   /// Returns the hosting actor system.
   inline actor_system& system() const {
-    CAF_ASSERT(context_);
-    return context_->system();
+    return home_system();
   }
 
   /// Returns the config of the hosting actor system.
@@ -208,7 +215,7 @@ public:
 
   /// @cond PRIVATE
 
-  void monitor(abstract_actor* ptr);
+  void monitor(abstract_actor* ptr, message_priority prio);
 
   /// @endcond
 
@@ -289,9 +296,9 @@ public:
 
   /// Adds a unidirectional `monitor` to `whom`.
   /// @note Each call to `monitor` creates a new, independent monitor.
-  template <class Handle>
+  template <message_priority P = message_priority::normal, class Handle = actor>
   void monitor(const Handle& whom) {
-    monitor(actor_cast<abstract_actor*>(whom));
+    monitor(actor_cast<abstract_actor*>(whom), P);
   }
 
   /// Removes a monitor from `whom`.
@@ -437,7 +444,7 @@ protected:
   message_id last_request_id_;
 
   /// Factory function for returning initial behavior in function-based actors.
-  std::function<behavior (local_actor*)> initial_behavior_fac_;
+  detail::unique_function<behavior(local_actor*)> initial_behavior_fac_;
 };
 
 } // namespace caf

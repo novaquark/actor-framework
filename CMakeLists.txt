@@ -250,7 +250,7 @@ if(CAF_MORE_WARNINGS)
                "-Wno-global-constructors -Wno-missing-prototypes "
                "-Wno-c++98-compat-pedantic -Wno-unused-member-function "
                "-Wno-unused-const-variable -Wno-switch-enum "
-               "-Wno-abstract-vbase-init "
+               "-Wno-abstract-vbase-init -Wno-shadow "
                "-Wno-missing-noreturn -Wno-covered-switch-default")
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(WFLAGS "-Waddress -Wall -Warray-bounds "
@@ -277,6 +277,18 @@ if(CAF_MORE_WARNINGS)
   string(REPLACE ";" "" WFLAGS_STR ${WFLAGS})
   build_string("EXTRA_FLAGS" "${WFLAGS_STR}")
 endif()
+# allow enabling IPO on gcc/clang
+if(POLICY CMP0069)
+  cmake_policy(SET CMP0069 NEW)
+else()
+  if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+      build_string("EXTRA_FLAGS" "-flto")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+      build_string("EXTRA_FLAGS" "-flto -fno-fat-lto-objects")
+    endif()
+  endif()
+endif()
 
 # add -stdlib=libc++ when using Clang if possible
 if(NOT CAF_NO_AUTO_LIBCPP AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -298,7 +310,7 @@ if(NOT CAF_NO_AUTO_LIBCPP AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CXXFLAGS_BACKUP}")
 endif()
 # enable address sanitizer if requested by the user
-if(CAF_ENABLE_ADDRESS_SANITIZER)
+if(CAF_ENABLE_ADDRESS_SANITIZER AND NOT WIN32)
   # check whether address sanitizer is available
   set(CXXFLAGS_BACKUP "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "-fsanitize=address -fno-omit-frame-pointer")
@@ -314,7 +326,7 @@ if(CAF_ENABLE_ADDRESS_SANITIZER)
   endif()
   # restore CXX flags
   set(CMAKE_CXX_FLAGS "${CXXFLAGS_BACKUP}")
-endif(CAF_ENABLE_ADDRESS_SANITIZER)
+endif()
 # -pthread is ignored on MacOSX but required on other platforms
 if(NOT APPLE AND NOT WIN32)
     build_string("EXTRA_FLAGS" "-pthread")
@@ -329,7 +341,7 @@ if(MINGW)
   build_string("EXTRA_FLAGS" "-static")
 elseif(CYGWIN)
   build_string("EXTRA_FLAGS" "-U__STRICT_ANSI__")
-else()
+elseif(NOT CAF_BUILD_STATIC_ONLY)
   build_string("EXTRA_FLAGS" "-fPIC")
 endif()
 if (WIN32)
@@ -388,7 +400,7 @@ else()
   string(TOUPPER "${CAF_LOG_LEVEL}" CAF_LOG_LEVEL)
 endif()
 
-set(validLogLevels QUIET ERROR WARNING DEBUG TRACE)
+set(validLogLevels QUIET ERROR WARNING INFO DEBUG TRACE)
 list(FIND validLogLevels "${CAF_LOG_LEVEL}" logLevelIndex)
 if(logLevelIndex LESS 0)
   MESSAGE(FATAL_ERROR "Invalid log level: \"${CAF_LOG_LEVEL}\"")

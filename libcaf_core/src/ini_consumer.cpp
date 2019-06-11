@@ -42,7 +42,6 @@ ini_list_consumer abstract_ini_consumer::begin_list() {
   return {this};
 }
 
-
 // -- map_consumer -------------------------------------------------------------
 
 ini_map_consumer::ini_map_consumer(abstract_ini_consumer* parent)
@@ -153,28 +152,51 @@ ini_consumer* ini_category_consumer::dparent() {
 
 // -- ini_consumer -------------------------------------------------------------
 
-ini_consumer::ini_consumer(config_option_set& options, config_map& cfg)
+ini_consumer::ini_consumer(config_option_set& options, settings& cfg)
     : options_(options),
-      cfg_(cfg) {
+      cfg_(cfg),
+      current_key_("global") {
   // nop
 }
 
 ini_category_consumer ini_consumer::begin_map() {
-  return {this, current_key};
+  return {this, current_key_};
 }
 
 void ini_consumer::key(std::string name) {
-  current_key = std::move(name);
+  current_key_ = std::move(name);
 }
 
 void ini_consumer::value_impl(config_value&& x) {
-  auto dict = get_if<config_value::dictionary>(&x);
-  if (dict != nullptr && !dict->empty()) {
-    // We need to "merge" values into the destination, because it can already
-    // contain any number of unrelated entries.
-    auto& dst = cfg_[current_key];
-    for (auto& entry : *dict)
-      dst.insert_or_assign(entry.first, std::move(entry.second));
+  using dict_type = config_value::dictionary;
+  auto dict = get_if<dict_type>(&x);
+  if (dict == nullptr) {
+    warnings_.emplace_back(make_error(pec::type_mismatch,
+                                      "expected a dictionary at top level"));
+    return;
+  }
+  if (current_key_ != "global") {
+    auto& dst = cfg_.emplace(current_key_, dict_type{}).first->second;
+    if (dict != nullptr && !dict->empty() && holds_alternative<dict_type>(dst)) {
+      auto& dst_dict = get<dict_type>(dst);
+      // We need to "merge" values into the destination, because it can already
+      // contain any number of unrelated entries.
+      for (auto& entry : *dict)
+        dst_dict.insert_or_assign(entry.first, std::move(entry.second));
+    }
+  } else {
+    std::string prev_key;
+    swap(current_key_, prev_key);
+    for (auto& entry : *dict) {
+      if (holds_alternative<dict_type>(entry.second)) {
+        // Recurse into top-level maps.
+        current_key_ = std::move(entry.first);
+        value_impl(std::move(entry.second));
+      } else {
+        cfg_.insert_or_assign(entry.first, std::move(entry.second));
+      }
+    }
+    swap(prev_key, current_key_);
   }
 }
 

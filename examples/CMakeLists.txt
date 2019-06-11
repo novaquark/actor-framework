@@ -1,4 +1,3 @@
-cmake_minimum_required(VERSION 2.8)
 project(caf_examples CXX)
 
 add_custom_target(all_examples)
@@ -55,6 +54,9 @@ add(remoting distributed_calculator)
 # basic I/O with brokers
 add(broker simple_broker)
 add(broker simple_http_broker)
+
+# testing DSL
+add(testing ping_pong)
 
 if(CAF_BUILD_PROTOBUF_EXAMPLES)
   find_package(Protobuf)

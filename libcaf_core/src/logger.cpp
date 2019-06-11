@@ -188,8 +188,6 @@ string_view reduce_symbol(std::ostream& out, string_view symbol) {
   return symbol;
 }
 
-#if CAF_LOG_LEVEL >= 0
-
 #if defined(CAF_NO_THREAD_LOCAL)
 
 pthread_key_t s_key;
@@ -232,17 +230,6 @@ inline logger* get_current_logger() {
 
 #endif // CAF_NO_THREAD_LOCAL
 
-#else // CAF_LOG_LEVEL
-
-inline void set_current_logger(logger*) {
-  // nop
-}
-
-inline logger* get_current_logger() {
-  return nullptr;
-}
-#endif // CAF_LOG_LEVEL
-
 } // namespace <anonymous>
 
 logger::config::config()
@@ -254,7 +241,7 @@ logger::config::config()
   // nop
 }
 
-logger::event::event(unsigned lvl, unsigned line, string_view cat,
+logger::event::event(unsigned lvl, unsigned line, atom_value cat,
                      string_view full_fun, string_view fun, string_view fn,
                      std::string msg, std::thread::id t, actor_id a,
                      timestamp ts)
@@ -351,18 +338,14 @@ logger* logger::current_logger() {
   return get_current_logger();
 }
 
-bool logger::accepts(unsigned level, string_view cname) {
+bool logger::accepts(unsigned level, atom_value cname) {
   if (level > cfg_.verbosity)
     return false;
-  if (!component_filter.empty()) {
-    auto it = std::search(component_filter.begin(), component_filter.end(),
-                          cname.begin(), cname.end());
-    return it != component_filter.end();
-  }
-  return true;
+  return !std::any_of(component_blacklist.begin(), component_blacklist.end(),
+                      [=](atom_value name) { return name == cname; });
 }
 
-logger::logger(actor_system& sys) : system_(sys) {
+logger::logger(actor_system& sys) : system_(sys), t0_(make_timestamp()) {
   // nop
 }
 
@@ -377,8 +360,10 @@ logger::~logger() {
 void logger::init(actor_system_config& cfg) {
   CAF_IGNORE_UNUSED(cfg);
   namespace lg = defaults::logger;
-  component_filter = get_or(cfg, "logger.component-filter",
-                            lg::component_filter);
+  using atom_list = std::vector<atom_value>;
+  auto blacklist = get_if<atom_list>(&cfg, "logger.component-blacklist");
+  if (blacklist)
+    component_blacklist = move_if_optional(blacklist);
   // Parse the configured log level.
   auto verbosity = get_if<atom_value>(&cfg, "logger.verbosity");
   auto file_verbosity = verbosity ? *verbosity : lg::file_verbosity;
@@ -404,6 +389,17 @@ void logger::init(actor_system_config& cfg) {
     // Disable console output if neither 'colored' nor 'uncolored' are present.
     cfg_.console_verbosity = CAF_LOG_LEVEL_QUIET;
   }
+}
+
+bool logger::open_file() {
+  if (file_verbosity() == CAF_LOG_LEVEL_QUIET || file_name_.empty())
+    return false;
+  file_.open(file_name_, std::ios::out | std::ios::app);
+  if (!file_) {
+    std::cerr << "unable to open log file " << file_name_ << std::endl;
+    return false;
+  }
+  return true;
 }
 
 void logger::render_fun_prefix(std::ostream& out, const event& x) {
@@ -476,7 +472,7 @@ void logger::render(std::ostream& out, const line_format& lf,
                     const event& x) const {
   for (auto& f : lf)
     switch (f.kind) {
-      case category_field: out << x.category_name; break;
+      case category_field: out << to_string(x.category_name); break;
       case class_name_field: render_fun_prefix(out, x); break;
       case date_field: render_date(out, x.tstamp); break;
       case file_field: out << x.file_name; break;
@@ -547,16 +543,26 @@ string_view logger::skip_path(string_view path) {
 }
 
 void logger::run() {
+  // Bail out without printing anything if the first event we receive is the
+  // shutdown (empty) event.
+  queue_.wait_nonempty();
+  if (queue_.front().message.empty())
+    return;
+  if (!open_file() && console_verbosity() == CAF_LOG_LEVEL_QUIET)
+    return;
   log_first_line();
+  // Loop until receiving an empty message.
   for (;;) {
-    queue_.wait_nonempty();
+    // Handle current head of the queue.
     auto& e = queue_.front();
     if (e.message.empty()) {
       log_last_line();
       return;
     }
     handle_event(e);
+    // Prepare next iteration.
     queue_.pop_front();
+    queue_.wait_nonempty();
   }
 }
 
@@ -609,8 +615,8 @@ void logger::log_first_line() {
     msg += to_string(get_or(system_.config(), config_name, default_value));
     msg += ", node = ";
     msg += to_string(system_.node());
-    msg += ", component_filter = ";
-    msg += deep_to_string(component_filter);
+    msg += ", component-blacklist = ";
+    msg += deep_to_string(component_blacklist);
     return msg;
   };
   namespace lg = defaults::logger;
@@ -629,49 +635,48 @@ void logger::start() {
   parent_thread_ = std::this_thread::get_id();
   if (verbosity() == CAF_LOG_LEVEL_QUIET)
     return;
-  t0_ = make_timestamp();
-  auto f = get_or(system_.config(), "logger.file-name",
+  file_name_ = get_or(system_.config(), "logger.file-name",
                   defaults::logger::file_name);
-  if (f.empty()) {
+  if (file_name_.empty()) {
     // No need to continue if console and log file are disabled.
     if (console_verbosity() == CAF_LOG_LEVEL_QUIET)
       return;
   } else {
     // Replace placeholders.
     const char pid[] = "[PID]";
-    auto i = std::search(f.begin(), f.end(), std::begin(pid),
+    auto i = std::search(file_name_.begin(), file_name_.end(), std::begin(pid),
                          std::end(pid) - 1);
-    if (i != f.end()) {
+    if (i != file_name_.end()) {
       auto id = std::to_string(detail::get_process_id());
-      f.replace(i, i + sizeof(pid) - 1, id);
+      file_name_.replace(i, i + sizeof(pid) - 1, id);
     }
     const char ts[] = "[TIMESTAMP]";
-    i = std::search(f.begin(), f.end(), std::begin(ts), std::end(ts) - 1);
-    if (i != f.end()) {
+    i = std::search(file_name_.begin(), file_name_.end(), std::begin(ts),
+                    std::end(ts) - 1);
+    if (i != file_name_.end()) {
       auto t0_str = timestamp_to_string(t0_);
-      f.replace(i, i + sizeof(ts) - 1, t0_str);
+      file_name_.replace(i, i + sizeof(ts) - 1, t0_str);
     }
     const char node[] = "[NODE]";
-    i = std::search(f.begin(), f.end(), std::begin(node), std::end(node) - 1);
-    if (i != f.end()) {
+    i = std::search(file_name_.begin(), file_name_.end(), std::begin(node),
+                    std::end(node) - 1);
+    if (i != file_name_.end()) {
       auto nid = to_string(system_.node());
-      f.replace(i, i + sizeof(node) - 1, nid);
-    }
-    file_.open(f, std::ios::out | std::ios::app);
-    if (!file_) {
-      std::cerr << "unable to open log file " << f << std::endl;
-      return;
+      file_name_.replace(i, i + sizeof(node) - 1, nid);
     }
   }
-  if (cfg_.inline_output)
+  if (cfg_.inline_output) {
+    // Open file immediately for inline output.
+    open_file();
     log_first_line();
-  else
+  } else {
     thread_ = std::thread{[this] {
       detail::set_thread_name("caf.logger");
       this->system_.thread_started();
       this->run();
       this->system_.thread_terminates();
     }};
+  }
 }
 
 void logger::stop() {

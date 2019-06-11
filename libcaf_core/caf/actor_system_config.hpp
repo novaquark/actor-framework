@@ -35,6 +35,7 @@
 #include "caf/fwd.hpp"
 #include "caf/is_typed_actor.hpp"
 #include "caf/named_actor_config.hpp"
+#include "caf/settings.hpp"
 #include "caf/stream.hpp"
 #include "caf/thread_hook.hpp"
 #include "caf/type_erased_value.hpp"
@@ -103,7 +104,7 @@ public:
   // -- properties -------------------------------------------------------------
 
   /// @private
-  dictionary<config_value::dictionary> content;
+  settings content;
 
   /// Sets a config by using its INI name `config_name` to `config_value`.
   template <class T>
@@ -113,30 +114,23 @@ public:
 
   // -- modifiers --------------------------------------------------------------
 
-  /// Parses `args` as tuple of strings containing CLI options
-  /// and `ini_stream` as INI formatted input stream.
-  actor_system_config& parse(string_list args, std::istream& ini);
+  /// Parses `args` as tuple of strings containing CLI options and `ini_stream`
+  /// as INI formatted input stream.
+  error parse(string_list args, std::istream& ini);
 
   /// Parses `args` as tuple of strings containing CLI options and tries to
   /// open `ini_file_cstr` as INI formatted config file. The parsers tries to
   /// open `caf-application.ini` if `ini_file_cstr` is `nullptr`.
-  actor_system_config& parse(string_list args,
-                             const char* ini_file_cstr = nullptr);
+  error parse(string_list args, const char* ini_file_cstr = nullptr);
 
-  /// Parses the CLI options `{argc, argv}` and
-  /// `ini_stream` as INI formatted input stream.
-  actor_system_config& parse(int argc, char** argv, std::istream& ini);
+  /// Parses the CLI options `{argc, argv}` and `ini_stream` as INI formatted
+  /// input stream.
+  error parse(int argc, char** argv, std::istream& ini);
 
   /// Parses the CLI options `{argc, argv}` and tries to open `ini_file_cstr`
   /// as INI formatted config file. The parsers tries to open
   /// `caf-application.ini` if `ini_file_cstr` is `nullptr`.
-  actor_system_config& parse(int argc, char** argv,
-                             const char* ini_file_cstr = nullptr);
-
-  actor_system_config&
-  parse(message& args, const char* ini_file_cstr = nullptr) CAF_DEPRECATED;
-
-  actor_system_config& parse(message& args, std::istream& ini) CAF_DEPRECATED;
+  error parse(int argc, char** argv, const char* ini_file_cstr = nullptr);
 
   /// Allows other nodes to spawn actors created by `fun`
   /// dynamically by using `name` as identifier.
@@ -237,7 +231,8 @@ public:
   /// Adds a hook type to the scheduler.
   template <class Hook, class... Ts>
   actor_system_config& add_thread_hook(Ts&&... ts) {
-    thread_hooks_.emplace_back(new Hook(std::forward<Ts>(ts)...));
+    std::unique_ptr<thread_hook> hook{new Hook(std::forward<Ts>(ts)...)};
+    thread_hooks_.emplace_back(std::move(hook));
     return *this;
   }
 
@@ -247,9 +242,6 @@ public:
   /// application should not use this config to initialize an `actor_system`
   /// and instead return from `main` immediately.
   bool cli_helptext_printed;
-
-  /// Stores CLI arguments that were not consumed by CAF.
-  message args_remainder CAF_DEPRECATED;
 
   /// Stores CLI arguments that were not consumed by CAF.
   string_list remainder;
@@ -278,49 +270,6 @@ public:
 
   /// @private
   timespan stream_tick_duration() const noexcept;
-
-  timespan streaming_credit_round_interval() const noexcept CAF_DEPRECATED;
-
-  // -- scheduling parameters --------------------------------------------------
-
-  atom_value scheduler_policy CAF_DEPRECATED;
-  size_t scheduler_max_threads CAF_DEPRECATED;
-  size_t scheduler_max_throughput CAF_DEPRECATED;
-  bool scheduler_enable_profiling CAF_DEPRECATED;
-  size_t scheduler_profiling_ms_resolution CAF_DEPRECATED;
-  std::string scheduler_profiling_output_file CAF_DEPRECATED;
-
-  // -- work-stealing parameters -----------------------------------------------
-
-  size_t work_stealing_aggressive_poll_attempts CAF_DEPRECATED;
-  size_t work_stealing_aggressive_steal_interval CAF_DEPRECATED;
-  size_t work_stealing_moderate_poll_attempts CAF_DEPRECATED;
-  size_t work_stealing_moderate_steal_interval CAF_DEPRECATED;
-  size_t work_stealing_moderate_sleep_duration_us CAF_DEPRECATED;
-  size_t work_stealing_relaxed_steal_interval CAF_DEPRECATED;
-  size_t work_stealing_relaxed_sleep_duration_us CAF_DEPRECATED;
-
-  // -- logger parameters ------------------------------------------------------
-
-  std::string logger_file_name CAF_DEPRECATED;
-  std::string logger_file_format CAF_DEPRECATED;
-  atom_value logger_console CAF_DEPRECATED;
-  std::string logger_console_format CAF_DEPRECATED;
-  std::string logger_component_filter CAF_DEPRECATED;
-  atom_value logger_verbosity CAF_DEPRECATED;
-  bool logger_inline_output CAF_DEPRECATED;
-
-  // -- middleman parameters ---------------------------------------------------
-
-  atom_value middleman_network_backend CAF_DEPRECATED;
-  std::string middleman_app_identifier CAF_DEPRECATED;
-  bool middleman_enable_automatic_connections CAF_DEPRECATED;
-  size_t middleman_max_consecutive_reads CAF_DEPRECATED;
-  size_t middleman_heartbeat_interval CAF_DEPRECATED;
-  bool middleman_detach_utility_actors CAF_DEPRECATED;
-  bool middleman_detach_multiplexer CAF_DEPRECATED;
-  size_t middleman_cached_udp_buffers CAF_DEPRECATED;
-  size_t middleman_max_pending_msgs CAF_DEPRECATED;
 
   // -- OpenCL parameters ------------------------------------------------------
 
@@ -368,6 +317,16 @@ public:
 
   int (*slave_mode_fun)(actor_system&, const actor_system_config&);
 
+  // -- default error rendering functions --------------------------------------
+
+  static std::string render(const error& err);
+
+  static std::string render_sec(uint8_t, atom_value, const message&);
+
+  static std::string render_exit_reason(uint8_t, atom_value, const message&);
+
+  static std::string render_pec(uint8_t, atom_value, const message&);
+
 protected:
   virtual std::string make_help_text(const std::vector<message::cli_arg>&);
 
@@ -384,12 +343,46 @@ private:
 
   actor_system_config& set_impl(string_view name, config_value value);
 
-  static std::string render_sec(uint8_t, atom_value, const message&);
-
-  static std::string render_exit_reason(uint8_t, atom_value, const message&);
-
   void extract_config_file_path(string_list& args);
+
+  /// Adjusts the content of the configuration, e.g., for ensuring backwards
+  /// compatibility with older options.
+  error adjust_content();
 };
 
-} // namespace caf
+/// @private
+const settings& content(const actor_system_config& cfg);
 
+/// Tries to retrieve the value associated to `name` from `cfg`.
+/// @relates config_value
+template <class T>
+optional<T> get_if(const actor_system_config* cfg, string_view name) {
+  return get_if<T>(&content(*cfg), name);
+}
+
+/// Retrieves the value associated to `name` from `cfg`.
+/// @relates config_value
+template <class T>
+T get(const actor_system_config& cfg, string_view name) {
+  return get<T>(content(cfg), name);
+}
+
+/// Retrieves the value associated to `name` from `cfg` or returns
+/// `default_value`.
+/// @relates config_value
+template <class T, class = typename std::enable_if<
+                     !std::is_pointer<T>::value
+                     && !std::is_convertible<T, string_view>::value>::type>
+T get_or(const actor_system_config& cfg, string_view name, T default_value) {
+  return get_or(content(cfg), name, std::move(default_value));
+}
+
+/// Retrieves the value associated to `name` from `cfg` or returns
+/// `default_value`.
+/// @relates config_value
+inline std::string get_or(const actor_system_config& cfg, string_view name,
+                          string_view default_value) {
+  return get_or(content(cfg), name, default_value);
+}
+
+} // namespace caf

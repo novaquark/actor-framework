@@ -5,7 +5,7 @@
  *                     | |___ / ___ \|  _|      Framework                     *
  *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011 - 2016                                                  *
+ * Copyright 2011-2019 Dominik Charousset                                     *
  *                                                                            *
  * Distributed under the terms and conditions of the BSD 3-Clause License or  *
  * (at your option) under the terms and conditions of the Boost Software      *
@@ -16,44 +16,36 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#pragma once
+#define CAF_SUITE rtti_pair
 
-#include "caf/io/abstract_broker.hpp"
+#include "caf/rtti_pair.hpp"
 
-namespace caf {
-namespace io {
+#include "caf/test/dsl.hpp"
 
-struct addr_visitor {
-  using result_type = std::string;
-  addr_visitor(abstract_broker* ptr) : ptr_(ptr) { }
-  template <class Handle>
-  result_type operator()(const Handle& hdl) { return ptr_->remote_addr(hdl); }
-  abstract_broker* ptr_;
+using namespace caf;
+
+namespace {
+
+struct foo {
+  int x;
+  int y;
 };
 
-struct port_visitor {
-  using result_type = uint16_t;
-  port_visitor(abstract_broker* ptr) : ptr_(ptr) { }
-  template <class Handle>
-  result_type operator()(const Handle& hdl) { return ptr_->remote_port(hdl); }
-  abstract_broker* ptr_;
-};
+} // namespace <anonymous>
 
-struct id_visitor {
-  using result_type = int64_t;
-  template <class Handle>
-  result_type operator()(const Handle& hdl) { return hdl.id(); }
-};
+CAF_TEST(make_rtti_pair) {
+  auto n = type_nr<int32_t>::value;
+  CAF_REQUIRE_NOT_EQUAL(n, 0u);
+  auto x1 = make_rtti_pair<int32_t>();
+  CAF_CHECK_EQUAL(x1.first, n);
+  CAF_CHECK_EQUAL(x1.second, nullptr);
+  auto x2 = make_rtti_pair<foo>();
+  CAF_CHECK_EQUAL(x2.first, 0);
+  CAF_CHECK_EQUAL(x2.second, &typeid(foo));
+}
 
-struct hash_visitor {
-  using result_type = size_t;
-  template <class Handle>
-  result_type operator()(const Handle& hdl) const {
-    std::hash<Handle> f;
-    return f(hdl);
-  }
-};
-
-} // namespace io
-} // namespace caf
-
+CAF_TEST(to_string) {
+  auto n = type_nr<int32_t>::value;
+  CAF_CHECK_EQUAL(to_string(make_rtti_pair<int32_t>()),
+                  "(" + std::to_string(n) + ", <null>)");
+}

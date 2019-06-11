@@ -64,7 +64,7 @@ std::string config_option_set::help_text(bool global_only) const {
     string_builder sb;
     if (x.short_names().empty()) {
       sb << "  --";
-      if (x.category() != "global")
+      if (!x.has_flat_cli_name())
         sb << x.category() << '.';
       sb << x.long_name();
       if (!x.is_flag())
@@ -74,7 +74,7 @@ std::string config_option_set::help_text(bool global_only) const {
       for (auto c : x.short_names())
         sb << '-' << c << '|';
       sb << "--";
-      if (x.category() != "global")
+      if (!x.has_flat_cli_name())
         sb << x.category() << '.';
       sb << x.long_name() << ") ";
     }
@@ -88,11 +88,15 @@ std::string config_option_set::help_text(bool global_only) const {
   std::multimap<string_view, pair> args;
   size_t max_arg_size = 0;
   for (auto& opt : opts_) {
-    if (!global_only || opt.category() == "global") {
+    // We treat all options with flat name as-if the category was 'global'.
+    if (!global_only || opt.has_flat_cli_name()) {
       auto arg = build_argument(opt);
       max_arg_size = std::max(max_arg_size, arg.size());
-      categories.emplace(opt.category());
-      args.emplace(opt.category(), std::make_pair(std::move(arg), &opt));
+      string_view category = "global";
+      if (!opt.has_flat_cli_name())
+        category = opt.category();
+      categories.emplace(category);
+      args.emplace(category, std::make_pair(std::move(arg), &opt));
     }
   }
   // Build help text by iterating over all categories in the multimap.
@@ -111,7 +115,20 @@ std::string config_option_set::help_text(bool global_only) const {
   return std::move(builder.result);
 }
 
-auto config_option_set::parse(config_map& config, argument_iterator first,
+namespace {
+
+settings& select_entry(settings& config, string_view key){
+  auto sep = key.find('.');
+  if (sep == string_view::npos)
+    return config[key].as_dictionary();
+  auto prefix = key.substr(0, sep);
+  auto suffix = key.substr(sep + 1);
+  return select_entry(config[prefix].as_dictionary(), suffix);
+}
+
+} // namespace
+
+auto config_option_set::parse(settings& config, argument_iterator first,
                               argument_iterator last) const
   -> std::pair<pec, argument_iterator> {
   // Sanity check.
@@ -124,38 +141,27 @@ auto config_option_set::parse(config_map& config, argument_iterator first,
     auto opt_name = opt.long_name();
     auto opt_ctg = opt.category();
     // Try inserting a new submap into the config or fill existing one.
-    auto& submap = config[opt_ctg];
+    auto& entry = opt_ctg == "global" ? config : select_entry(config, opt_ctg);
     // Flags only consume the current element.
     if (opt.is_flag()) {
       if (arg_begin != arg_end)
         return pec::illegal_argument;
       config_value cfg_true{true};
       opt.store(cfg_true);
-      submap[opt_name] = cfg_true;
+      entry[opt_name] = cfg_true;
     } else {
       if (arg_begin == arg_end)
         return pec::missing_argument;
       auto slice_size = static_cast<size_t>(std::distance(arg_begin, arg_end));
       string_view slice{&*arg_begin, slice_size};
-      auto val = config_value::parse(slice);
-      if (!val)
+      auto val = opt.parse(slice);
+      if (!val) {
+        auto& err = val.error();
+        if (err.category() == atom("parser"))
+          return static_cast<pec>(err.code());
         return pec::illegal_argument;
-      if (opt.check(*val) != none) {
-        // The parser defaults to unescaped strings. For example, --foo=bar
-        // will interpret `bar` as a string. Hence, we'll get a type mismatch
-        // if `foo` expects an atom. We check this special case here to avoid
-        // the clumsy --foo="'bar'" notation on the command line.
-        if (holds_alternative<std::string>(*val)
-            && opt.type_name() == "atom"
-            && slice.substr(0, 1) != "\""
-            && slice.size() <= 10) {
-          *val = atom_from_string(std::string{slice.begin(), slice.end()});
-        } else {
-          return pec::type_mismatch;
-        }
       }
-      opt.store(*val);
-      submap[opt_name] = std::move(*val);
+      entry[opt_name] = std::move(*val);
     }
     return pec::success;
   };
@@ -177,8 +183,9 @@ auto config_option_set::parse(config_map& config, argument_iterator first,
       if (opt == nullptr)
         return {pec::not_an_option, i};
       auto code = consume(*opt,
-                          assign_op == npos ? i->end()
-                                            : i->begin() + assign_op + 1,
+                          assign_op == npos
+                          ? i->end()
+                          : i->begin() + static_cast<ptrdiff_t>(assign_op + 1),
                           i->end());
       if (code != pec::success)
         return {code, i};
@@ -222,32 +229,32 @@ auto config_option_set::parse(config_map& config, argument_iterator first,
 }
 
 config_option_set::parse_result
-config_option_set::parse(config_map& config,
+config_option_set::parse(settings& config,
                          const std::vector<string>& args) const {
   return parse(config, args.begin(), args.end());
 }
 
 config_option_set::option_pointer
-config_option_set::cli_long_name_lookup(string_view name) const {
+config_option_set::cli_long_name_lookup(string_view input) const {
   // We accept "caf#" prefixes for backward compatibility, but ignore them.
-  size_t offset = name.compare(0, 4, "caf#") != 0 ? 0u : 4u;
+  auto name = input.substr(input.compare(0, 4, "caf#") != 0 ? 0u : 4u);
   // Extract category and long name.
   string_view category;
   string_view long_name;
-  auto sep = name.find('.', offset);
+  auto sep = name.find_last_of('.');
   if (sep == string::npos) {
-    category = "global";
-    if (offset == 0)
-      long_name = name;
-    else
-      long_name = name.substr(offset);
+    long_name = name;
   } else {
-    category = name.substr(offset, sep);
+    category = name.substr(0, sep);
     long_name = name.substr(sep + 1);
   }
   // Scan all options for a match.
+  auto category_match = [&](const config_option& opt) {
+    return sep == string::npos ? opt.has_flat_cli_name()
+                               : opt.category() == category;
+  };
   return detail::ptr_find_if(opts_, [&](const config_option& opt) {
-    return opt.category() == category && opt.long_name() == long_name;
+    return category_match(opt) && opt.long_name() == long_name;
   });
 }
 

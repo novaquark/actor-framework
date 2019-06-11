@@ -328,6 +328,8 @@ private:
   map_type xs_;
 };
 
+// -- operators ----------------------------------------------------------------
+
 // @relates dictionary
 template <class T>
 bool operator==(const dictionary<T>& xs, const dictionary<T>& ys) {

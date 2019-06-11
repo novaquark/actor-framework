@@ -40,5 +40,11 @@ struct actor_marker<behavior> {
   using type = dynamically_typed_actor_base;
 };
 
+template <class T>
+using is_statically_typed = std::is_base_of<statically_typed_actor_base, T>;
+
+template <class T>
+using is_dynamically_typed = std::is_base_of<dynamically_typed_actor_base, T>;
+
 } // namespace caf
 

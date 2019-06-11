@@ -37,6 +37,7 @@
 #include "caf/fwd.hpp"
 #include "caf/inbound_path.hpp"
 #include "caf/invoke_message_result.hpp"
+#include "caf/is_actor_handle.hpp"
 #include "caf/local_actor.hpp"
 #include "caf/logger.hpp"
 #include "caf/make_sink_result.hpp"
@@ -141,7 +142,7 @@ public:
   using stream_manager_map = std::map<stream_slot, stream_manager_ptr>;
 
   /// Stores asynchronous messages with default priority.
-  using default_queue = intrusive::drr_cached_queue<policy::normal_messages>;
+  using normal_queue = intrusive::drr_cached_queue<policy::normal_messages>;
 
   /// Stores asynchronous messages with hifh priority.
   using urgent_queue = intrusive::drr_cached_queue<policy::urgent_messages>;
@@ -170,18 +171,18 @@ public:
     using unique_pointer = mailbox_element_ptr;
 
     using queue_type =
-      intrusive::wdrr_fixed_multiplexed_queue<policy::categorized,
-                                              default_queue, upstream_queue,
-                                              downstream_queue, urgent_queue>;
-
-    static constexpr size_t default_queue_index = 0;
-
-    static constexpr size_t upstream_queue_index = 1;
-
-    static constexpr size_t downstream_queue_index = 2;
-
-    static constexpr size_t urgent_queue_index = 3;
+      intrusive::wdrr_fixed_multiplexed_queue<policy::categorized, urgent_queue,
+                                              normal_queue, upstream_queue,
+                                              downstream_queue>;
   };
+
+  static constexpr size_t urgent_queue_index = 0;
+
+  static constexpr size_t normal_queue_index = 1;
+
+  static constexpr size_t upstream_queue_index = 2;
+
+  static constexpr size_t downstream_queue_index = 3;
 
   /// A queue optimized for single-reader-many-writers.
   using mailbox_type = intrusive::fifo_inbox<mailbox_policy>;
@@ -471,7 +472,7 @@ public:
   template <class Init, class Pull, class Done, class Finalize = unit_t,
             class DownstreamManager = default_downstream_manager_t<Pull>,
             class Trait = stream_source_trait_t<Pull>>
-  detail::enable_if_t<!detail::is_actor_handle<Init>::value && Trait::valid,
+  detail::enable_if_t<!is_actor_handle<Init>::value && Trait::valid,
                       make_source_result_t<DownstreamManager>>
   make_source(Init init, Pull pull, Done done, Finalize finalize = {},
               policy::arg<DownstreamManager> token = {}) {
@@ -484,7 +485,7 @@ public:
             class Finalize = unit_t,
             class DownstreamManager = default_downstream_manager_t<Pull>,
             class Trait = stream_source_trait_t<Pull>>
-  detail::enable_if_t<detail::is_actor_handle<ActorHandle>::value,
+  detail::enable_if_t<is_actor_handle<ActorHandle>::value,
                       make_source_result_t<DownstreamManager>>
   make_source(const ActorHandle& dest, std::tuple<Ts...> xs, Init init,
               Pull pull, Done done, Finalize fin = {},
@@ -505,7 +506,7 @@ public:
             class Finalize = unit_t,
             class DownstreamManager = default_downstream_manager_t<Pull>,
             class Trait = stream_source_trait_t<Pull>>
-  detail::enable_if_t<detail::is_actor_handle<ActorHandle>::value && Trait::valid,
+  detail::enable_if_t<is_actor_handle<ActorHandle>::value && Trait::valid,
                       make_source_result_t<DownstreamManager>>
   make_source(const ActorHandle& dest, Init init, Pull pull, Done done,
               Finalize fin = {},
@@ -727,7 +728,7 @@ public:
   void push_to_cache(mailbox_element_ptr ptr);
 
   /// Returns the default queue of the mailbox that stores ordinary messages.
-  default_queue& get_default_queue();
+  normal_queue& get_normal_queue();
 
   /// Returns the queue of the mailbox that stores `upstream_msg` messages.
   upstream_queue& get_upstream_queue();
@@ -743,7 +744,8 @@ public:
   /// Creates a new path for incoming stream traffic from `sender`.
   virtual inbound_path* make_inbound_path(stream_manager_ptr mgr,
                                           stream_slots slots,
-                                          strong_actor_ptr sender);
+                                          strong_actor_ptr sender,
+                                          rtti_pair rtti);
 
   /// Silently closes incoming stream traffic on `slot`.
   virtual void erase_inbound_path_later(stream_slot slot);

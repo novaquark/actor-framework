@@ -131,12 +131,12 @@ scheduled_actor::scheduled_actor(actor_config& cfg)
   CAF_ASSERT(interval.count() > 0);
   stream_ticks_.interval(interval);
   CAF_ASSERT(sys_cfg.stream_max_batch_delay.count() > 0);
-  max_batch_delay_ticks_ = sys_cfg.stream_max_batch_delay.count()
-                           / interval.count();
+  auto div = [](timespan x, timespan y) {
+    return static_cast<size_t>(x.count() / y.count());
+  };
+  max_batch_delay_ticks_ = div(sys_cfg.stream_max_batch_delay, interval);
   CAF_ASSERT(max_batch_delay_ticks_ > 0);
-  CAF_ASSERT(sys_cfg.stream_credit_round_interval.count() > 0);
-  credit_round_ticks_ = sys_cfg.stream_credit_round_interval.count()
-                        / interval.count();
+  credit_round_ticks_ = div(sys_cfg.stream_credit_round_interval, interval);
   CAF_ASSERT(credit_round_ticks_ > 0);
   CAF_LOG_DEBUG(CAF_ARG(interval) << CAF_ARG(max_batch_delay_ticks_)
                 << CAF_ARG(credit_round_ticks_));
@@ -144,7 +144,7 @@ scheduled_actor::scheduled_actor(actor_config& cfg)
 
 scheduled_actor::~scheduled_actor() {
   // signalize to the private thread object that it is
-  // unrachable and can be destroyed as well
+  // unreachable and can be destroyed as well
   if (private_thread_ != nullptr)
     private_thread_->notify_self_destroyed();
 }
@@ -238,7 +238,7 @@ bool scheduled_actor::cleanup(error&& fail_state, execution_unit* host) {
   // Clear mailbox.
   if (!mailbox_.closed()) {
     mailbox_.close();
-    get_default_queue().flush_cache();
+    get_normal_queue().flush_cache();
     get_urgent_queue().flush_cache();
     detail::sync_request_bouncer bounce{fail_state};
     while (mailbox_.queue().new_round(1000, bounce).consumed_items)
@@ -548,25 +548,24 @@ scheduled_actor::categorize(mailbox_element& x) {
     case make_type_token<atom_value, atom_value, std::string>():
       if (content.get_as<atom_value>(0) == sys_atom::value
           && content.get_as<atom_value>(1) == get_atom::value) {
+        auto rp = make_response_promise();
+        if (!rp.pending()) {
+          CAF_LOG_WARNING("received anonymous ('get', 'sys', $key) message");
+          return message_category::internal;
+        }
         auto& what = content.get_as<std::string>(2);
         if (what == "info") {
           CAF_LOG_DEBUG("reply to 'info' message");
-          x.sender->enqueue(
-            make_mailbox_element(ctrl(), x.mid.response_id(),
-                                  {}, ok_atom::value, std::move(what),
-                                  strong_actor_ptr{ctrl()}, name()),
-            context());
+          rp.deliver(ok_atom::value, std::move(what), strong_actor_ptr{ctrl()},
+                     name());
         } else {
-          x.sender->enqueue(
-            make_mailbox_element(ctrl(), x.mid.response_id(),
-                                  {}, sec::unsupported_sys_key),
-            context());
+          rp.deliver(make_error(sec::unsupported_sys_key));
         }
         return message_category::internal;
       }
       return message_category::ordinary;
     case make_type_token<timeout_msg>(): {
-      CAF_ASSERT(!x.mid.valid());
+      CAF_ASSERT(x.mid.is_async());
       auto& tm = content.get_as<timeout_msg>(0);
       auto tid = tm.timeout_id;
       if (tm.type == receive_atom::value) {
@@ -887,46 +886,44 @@ void scheduled_actor::push_to_cache(mailbox_element_ptr ptr) {
   auto& p = mailbox_.queue().policy();
   auto& qs = mailbox_.queue().queues();
   // TODO: use generic lambda to avoid code duplication when switching to C++14
-  if (p.id_of(*ptr) == mailbox_policy::default_queue_index) {
-    auto& q = std::get<mailbox_policy::default_queue_index>(qs);
+  if (p.id_of(*ptr) == normal_queue_index) {
+    auto& q = std::get<normal_queue_index>(qs);
     q.inc_total_task_size(q.policy().task_size(*ptr));
     q.cache().push_back(ptr.release());
   } else {
-    auto& q = std::get<mailbox_policy::default_queue_index>(qs);
+    auto& q = std::get<normal_queue_index>(qs);
     q.inc_total_task_size(q.policy().task_size(*ptr));
     q.cache().push_back(ptr.release());
   }
 }
 
-scheduled_actor::default_queue& scheduled_actor::get_default_queue() {
-  constexpr size_t queue_id = mailbox_policy::default_queue_index;
-  return get<queue_id>(mailbox_.queue().queues());
+scheduled_actor::normal_queue& scheduled_actor::get_normal_queue() {
+  return get<normal_queue_index>(mailbox_.queue().queues());
 }
 
 scheduled_actor::upstream_queue& scheduled_actor::get_upstream_queue() {
-  constexpr size_t queue_id = mailbox_policy::upstream_queue_index;
-  return get<queue_id>(mailbox_.queue().queues());
+  return get<upstream_queue_index>(mailbox_.queue().queues());
 }
 
 scheduled_actor::downstream_queue& scheduled_actor::get_downstream_queue() {
-  constexpr size_t queue_id = mailbox_policy::downstream_queue_index;
-  return get<queue_id>(mailbox_.queue().queues());
+  return get<downstream_queue_index>(mailbox_.queue().queues());
 }
 
 scheduled_actor::urgent_queue& scheduled_actor::get_urgent_queue() {
-  constexpr size_t queue_id = mailbox_policy::urgent_queue_index;
-  return get<queue_id>(mailbox_.queue().queues());
+  return get<urgent_queue_index>(mailbox_.queue().queues());
 }
 
 inbound_path* scheduled_actor::make_inbound_path(stream_manager_ptr mgr,
                                                  stream_slots slots,
-                                                 strong_actor_ptr sender) {
+                                                 strong_actor_ptr sender,
+                                                 rtti_pair rtti) {
+  static constexpr size_t queue_index = downstream_queue_index;
   using policy_type = policy::downstream_messages::nested;
-  auto& qs = mailbox_.queue().queues();
-  auto res = get<2>(qs).queues().emplace(slots.receiver, policy_type{nullptr});
+  auto& qs = get<queue_index>(mailbox_.queue().queues()).queues();
+  auto res = qs.emplace(slots.receiver, policy_type{nullptr});
   if (!res.second)
     return nullptr;
-  auto path = new inbound_path(std::move(mgr), slots, std::move(sender));
+  auto path = new inbound_path(std::move(mgr), slots, std::move(sender), rtti);
   res.first->second.policy().handler.reset(path);
   return path;
 }
@@ -1160,20 +1157,6 @@ scheduled_actor::handle_open_stream_msg(mailbox_element& x) {
       CAF_LOG_DEBUG("no match in behavior, fall back to default handler");
       return fallback();
     case match_case::result::match: {
-      /*
-      if (f.ptr == nullptr) {
-        CAF_LOG_WARNING("actor did not return a stream manager after "
-                        "handling open_stream_msg");
-        fail(sec::stream_init_failed, "behavior did not create a manager");
-        return im_dropped;
-      }
-      stream_slots path_id{osm.slot, f.in_slot};
-      auto path = make_inbound_path(f.ptr, path_id, std::move(osm.prev_stage));
-      CAF_ASSERT(path != nullptr);
-      path->emit_ack_open(this, actor_cast<actor_addr>(osm.original_stage));
-      // Propagate handshake down the pipeline.
-      build_pipeline(f.in_slot, f.out_slot, std::move(f.ptr));
-      */
       return im_success;
     }
     default:
@@ -1203,12 +1186,12 @@ scheduled_actor::advance_streams(actor_clock::time_point now) {
     auto cycle = stream_ticks_.interval();
     cycle *= static_cast<decltype(cycle)::rep>(credit_round_ticks_);
     auto bc = home_system().config().stream_desired_batch_complexity;
-    auto& qs = get<2>(mailbox_.queue().queues()).queues();
+    auto& qs = get_downstream_queue().queues();
     for (auto& kvp : qs) {
       auto inptr = kvp.second.policy().handler.get();
       auto bs = static_cast<int32_t>(kvp.second.total_task_size());
       inptr->emit_ack_batch(this, bs, inptr->mgr->out().max_capacity(),
-                            cycle, bc);
+                            now, cycle, bc);
     }
   }
   return stream_ticks_.next_timeout(now, {max_batch_delay_ticks_,

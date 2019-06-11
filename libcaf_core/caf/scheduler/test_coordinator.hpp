@@ -86,7 +86,24 @@ public:
       return true;
     std::rotate(b, i, i + 1);
     return true;
+  }
 
+  /// Runs all jobs that satisfy the predicate.
+  template <class Predicate>
+  size_t run_jobs_filtered(Predicate predicate) {
+    size_t result = 0;
+    while (!jobs.empty()) {
+      auto b = jobs.begin();
+      auto e = jobs.end();
+      auto i = std::find_if(b, e, predicate);
+      if (i == e)
+        return result;
+      if (i != b)
+        std::rotate(b, i, i + 1);
+      run_once();
+      ++result;
+    }
+    return result;
   }
 
   /// Tries to execute a single event in FIFO order.
@@ -141,10 +158,6 @@ public:
   bool detaches_utility_actors() const override;
 
   detail::test_actor_clock& clock() noexcept override;
-
-  std::pair<size_t, size_t>
-  run_dispatch_loop(timespan cycle_duration = timespan{1})
-    CAF_DEPRECATED_MSG("use the testing DSL's run() instead");
 
 protected:
   void start() override;

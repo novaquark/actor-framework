@@ -25,6 +25,7 @@
 #include "caf/config.hpp"
 #include "caf/config_value.hpp"
 #include "caf/error.hpp"
+#include "caf/expected.hpp"
 #include "caf/optional.hpp"
 
 using std::move;
@@ -54,7 +55,7 @@ config_option::config_option(string_view category, string_view name,
   CAF_ASSERT(ts <= std::numeric_limits<uint16_t>::max());
   buf_size_ = static_cast<uint16_t>(ts);
   buf_.reset(new char[ts]);
-  // fille the buffer with "<category>.<long-name>,<short-name>,<descriptions>"
+  // fill the buffer with "<category>.<long-name>,<short-name>,<descriptions>"
   auto first = buf_.get();
   auto i = first;
   auto pos = [&] {
@@ -108,7 +109,7 @@ void swap(config_option& first, config_option& second) noexcept {
 // -- properties ---------------------------------------------------------------
 
 string_view config_option::category() const noexcept {
-  return buf_slice(0, category_separator_);
+  return buf_slice(buf_[0] == '?' ? 1 : 0, category_separator_);
 }
 
 string_view config_option::long_name() const noexcept {
@@ -124,7 +125,7 @@ string_view config_option::description() const noexcept {
 }
 
 string_view config_option::full_name() const noexcept {
-  return buf_slice(0, long_name_separator_);
+  return buf_slice(buf_[0] == '?' ? 1 : 0, long_name_separator_);
 }
 
 error config_option::check(const config_value& x) const {
@@ -145,6 +146,14 @@ string_view config_option::type_name() const noexcept {
 
 bool config_option::is_flag() const noexcept {
   return type_name() == "boolean";
+}
+
+bool config_option::has_flat_cli_name() const noexcept {
+  return buf_[0] == '?' || category() == "global";
+}
+
+expected<config_value> config_option::parse(string_view input) const {
+  return meta_->parse(value_, input);
 }
 
 optional<config_value> config_option::get() const {

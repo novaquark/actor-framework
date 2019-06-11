@@ -16,16 +16,17 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#include "caf/config.hpp"
-
 #define CAF_SUITE dynamic_spawn
-#include "caf/test/unit_test.hpp"
 
-#include <stack>
+#include "caf/actor_system.hpp"
+
+#include "caf/test/dsl.hpp"
+
 #include <atomic>
 #include <chrono>
-#include <iostream>
 #include <functional>
+#include <iostream>
+#include <stack>
 
 #include "caf/all.hpp"
 
@@ -100,14 +101,14 @@ public:
 
 // quits after 5 timeouts
 actor spawn_event_testee2(scoped_actor& parent) {
-  struct impl : event_based_actor {
+  struct wrapper : event_based_actor {
     actor parent;
-    impl(actor_config& cfg, actor parent_actor)
+    wrapper(actor_config& cfg, actor parent_actor)
         : event_based_actor(cfg),
           parent(std::move(parent_actor)) {
       inc_actor_instances();
     }
-    ~impl() override {
+    ~wrapper() override {
       dec_actor_instances();
     }
     behavior wait4timeout(int remaining) {
@@ -126,7 +127,7 @@ actor spawn_event_testee2(scoped_actor& parent) {
       return wait4timeout(5);
     }
   };
-  return parent->spawn<impl>(parent);
+  return parent->spawn<wrapper>(parent);
 }
 
 class testee_actor : public blocking_actor {
@@ -311,6 +312,29 @@ struct fixture {
 
 } // namespace <anonymous>
 
+CAF_TEST_FIXTURE_SCOPE(dynamic_spawn_tests, test_coordinator_fixture<>)
+
+CAF_TEST(mirror) {
+  auto mirror = self->spawn<simple_mirror>();
+  auto dummy = self->spawn([=](event_based_actor* ptr) -> behavior {
+    ptr->send(mirror, "hello mirror");
+    return {
+      [](const std::string& msg) { CAF_CHECK_EQUAL(msg, "hello mirror"); }};
+  });
+  run();
+  /*
+  self->send(mirror, "hello mirror");
+  run();
+  self->receive (
+    [](const std::string& msg) {
+      CAF_CHECK_EQUAL(msg, "hello mirror");
+    }
+  );
+  */
+}
+
+CAF_TEST_FIXTURE_SCOPE_END()
+
 CAF_TEST_FIXTURE_SCOPE(atom_tests, fixture)
 
 CAF_TEST(count_mailbox) {
@@ -334,17 +358,6 @@ CAF_TEST(self_receive_with_zero_timeout) {
     },
     after(chrono::seconds(0)) >> [] {
       // mailbox empty
-    }
-  );
-}
-
-CAF_TEST(mirror) {
-  scoped_actor self{system};
-  auto mirror = self->spawn<simple_mirror>();
-  self->send(mirror, "hello mirror");
-  self->receive (
-    [](const std::string& msg) {
-      CAF_CHECK_EQUAL(msg, "hello mirror");
     }
   );
 }
@@ -542,7 +555,7 @@ CAF_TEST(kill_the_immortal) {
 CAF_TEST(move_only_argument) {
   using unique_int = std::unique_ptr<int>;
   unique_int uptr{new int(42)};
-  auto impl = [](event_based_actor* self, unique_int ptr) -> behavior {
+  auto wrapper = [](event_based_actor* self, unique_int ptr) -> behavior {
     auto i = *ptr;
     return {
       [=](float) {
@@ -551,8 +564,24 @@ CAF_TEST(move_only_argument) {
       }
     };
   };
-  auto f = make_function_view(system.spawn(impl, std::move(uptr)));
+  auto f = make_function_view(system.spawn(wrapper, std::move(uptr)));
   CAF_CHECK_EQUAL(to_string(f(1.f)), "(42)");
+}
+
+CAF_TEST(move-only function object) {
+  struct move_only_fun {
+    move_only_fun() = default;
+    move_only_fun(const move_only_fun&) = delete;
+    move_only_fun(move_only_fun&&) = default;
+
+    behavior operator()(event_based_actor*)  {
+      return {};
+    }
+  };
+  actor_system_config cfg;
+  actor_system sys{cfg};
+  move_only_fun f;
+  sys.spawn(std::move(f));
 }
 
 CAF_TEST_FIXTURE_SCOPE_END()

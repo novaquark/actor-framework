@@ -18,13 +18,14 @@
 
 #pragma once
 
-#include "caf/io/basp/header.hpp"
-#include "caf/io/basp/version.hpp"
-#include "caf/io/basp/instance.hpp"
 #include "caf/io/basp/buffer_type.hpp"
+#include "caf/io/basp/connection_state.hpp"
+#include "caf/io/basp/endpoint_context.hpp"
+#include "caf/io/basp/header.hpp"
+#include "caf/io/basp/instance.hpp"
 #include "caf/io/basp/message_type.hpp"
 #include "caf/io/basp/routing_table.hpp"
-#include "caf/io/basp/connection_state.hpp"
+#include "caf/io/basp/version.hpp"
 
 /// @defgroup BASP Binary Actor Sytem Protocol
 ///
@@ -66,7 +67,7 @@
 ///   Whenever a node learns the address of a remotely running actor, it
 ///   creates  Ma local proxy instance representing this actor and sends an
 ///   `announce_proxy_instance` to the node hosting the actor. Whenever an actor
-///   terminates, the hosting node sends `kill_proxy_instance` messages to all
+///   terminates, the hosting node sends `down_message` messages to all
 ///   nodes that have a proxy for this actor. This enables network-transparent
 ///   actor monitoring. There are two possible ways addresses can be learned:
 ///

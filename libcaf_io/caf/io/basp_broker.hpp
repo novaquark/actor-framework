@@ -36,10 +36,7 @@
 
 #include "caf/io/basp/all.hpp"
 #include "caf/io/broker.hpp"
-#include "caf/io/visitors.hpp"
 #include "caf/io/typed_broker.hpp"
-
-#include "caf/io/basp/endpoint_context.hpp"
 
 namespace caf {
 namespace io {
@@ -91,55 +88,19 @@ struct basp_broker_state : proxy_registry::backend, basp::instance::callee {
   void learned_new_node_indirectly(const node_id& nid) override;
 
   // inherited from basp::instance::callee
-  uint16_t next_sequence_number(connection_handle hdl) override;
-
-  // inherited from basp::instance::callee
-  uint16_t next_sequence_number(datagram_handle hdl) override;
-
-  // inherited from basp::instance::callee
-  void add_pending(execution_unit* ctx, basp::endpoint_context& ep,
-                   uint16_t seq, basp::header hdr,
-                   std::vector<char> payload) override;
-
-  // inherited from basp::instance::callee
-  bool deliver_pending(execution_unit* ctx, basp::endpoint_context& ep,
-                       bool force) override;
-
-  // inherited from basp::instance::callee
-  void drop_pending(basp::endpoint_context& ep, uint16_t seq) override;
-
-  // inherited from basp::instance::callee
-  buffer_type& get_buffer(endpoint_handle hdl) override;
-
-  // inherited from basp::instance::callee
-  buffer_type& get_buffer(datagram_handle hdl) override;
-
-  // inherited from basp::instance::callee
   buffer_type& get_buffer(connection_handle hdl) override;
-
-  // inherited from basp::instance::callee
-  buffer_type pop_datagram_buffer(datagram_handle hdl) override;
-
-  // inherited from basp::instance::callee
-  void flush(endpoint_handle hdl) override;
-
-  // inherited from basp::instance::callee
-  void flush(datagram_handle hdl) override;
 
   // inherited from basp::instance::callee
   void flush(connection_handle hdl) override;
 
-  void handle_heartbeat(const node_id&) override {
-    // nop
-  }
+  // inherited from basp::instance::callee
+  void handle_heartbeat() override;
 
   /// Sets `this_context` by either creating or accessing state for `hdl`.
   void set_context(connection_handle hdl);
-  void set_context(datagram_handle hdl);
 
   /// Cleans up any state for `hdl`.
   void cleanup(connection_handle hdl);
-  void cleanup(datagram_handle hdl);
 
   // pointer to ourselves
   broker* self;
@@ -147,14 +108,10 @@ struct basp_broker_state : proxy_registry::backend, basp::instance::callee {
   // protocol instance of BASP
   basp::instance instance;
 
-  using ctx_tcp_map = std::unordered_map<connection_handle,
-                                         basp::endpoint_context>;
-  using ctx_udp_map = std::unordered_map<datagram_handle,
-                                         basp::endpoint_context>;
+  using ctx_map = std::unordered_map<connection_handle, basp::endpoint_context>;
 
   // keeps context information for all open connections
-  ctx_tcp_map ctx_tcp;
-  ctx_udp_map ctx_udp;
+  ctx_map ctx;
 
   // points to the current context for callbacks such as `make_proxy`
   basp::endpoint_context* this_context = nullptr;
@@ -167,19 +124,6 @@ struct basp_broker_state : proxy_registry::backend, basp::instance::callee {
   /// Configures whether BASP automatically open new connections to optimize
   /// routing paths by forming a mesh between all nodes.
   bool automatic_connections = false;
-
-  /// Configures whether BASP allows TCP connections.
-  bool allow_tcp = true;
-
-  /// Configures whether BASP allows UDP connections.
-  bool allow_udp = false;
-
-  // reusable send buffers for UDP communication
-  const size_t max_buffers;
-  std::stack<buffer_type> cached_buffers;
-
-  // maximum queue size for pending messages of endpoints with ordering
-  const size_t max_pending_messages;
 
   // timeout for delivery of pending messages of endpoints with ordering
   const std::chrono::milliseconds pending_to = std::chrono::milliseconds(100);
@@ -195,10 +139,10 @@ struct basp_broker_state : proxy_registry::backend, basp::instance::callee {
   // keeps a list of nodes that monitor a particular local actor
   monitored_actor_map monitored_actors;
 
-  // sends a kill_proxy message to a remote node
-  void send_kill_proxy_instance(const node_id& nid, actor_id aid, error err);
+  // sends a basp::down_message message to a remote node
+  void send_basp_down_message(const node_id& nid, actor_id aid, error err);
 
-  // sends kill_proxy_instance message to all nodes monitoring the terminated
+  // sends basp::down_message to all nodes monitoring the terminated
   // actor
   void handle_down_msg(down_msg&);
 

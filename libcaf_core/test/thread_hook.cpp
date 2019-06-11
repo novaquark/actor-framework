@@ -33,6 +33,8 @@ using atomic_count = std::atomic<size_t>;
 size_t assumed_thread_count;
 size_t assumed_init_calls;
 
+std::mutex mx;
+
 struct dummy_thread_hook : thread_hook {
   void init(actor_system&) override {
     // nop
@@ -119,7 +121,7 @@ CAF_TEST(counting_system_without_actor) {
   assumed_init_calls = 1;
   assumed_thread_count = get_or(cfg, "scheduler.max-threads",
                                 defaults::scheduler::max_threads)
-                         + 1; // caf.clock thread
+                         + 1; // caf.clock
   auto& sched = sys.scheduler();
   if (sched.detaches_utility_actors())
     assumed_thread_count += sched.num_utility_actors();
@@ -129,7 +131,7 @@ CAF_TEST(counting_system_with_actor) {
   assumed_init_calls = 1;
   assumed_thread_count = get_or(cfg, "scheduler.max-threads",
                                 defaults::scheduler::max_threads)
-                         + 2; // caf.clock thread plus detached actor
+                         + 2; // caf.clock and detached actor
   auto& sched = sys.scheduler();
   if (sched.detaches_utility_actors())
     assumed_thread_count += sched.num_utility_actors();

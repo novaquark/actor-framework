@@ -34,7 +34,6 @@ using ls = std::vector<std::string>;
 namespace {
 
 const char test_ini[] = R"(
-[global]
 is_server=true
 port=4242
 nodes=["sun", "venus", ]
@@ -45,10 +44,23 @@ file-name = "foobar.ini" ; our file name
 impl =       'foo';some atom
 )";
 
+const char test_ini2[] = R"(
+is_server = true
+logger = {
+  file-name = "foobar.ini"
+}
+port = 4242
+scheduler = {
+  timing = 2us,
+  impl = 'foo'
+}
+nodes = ["sun", "venus"]
+)";
+
 struct fixture {
   detail::parser::state<std::string::const_iterator> res;
   config_option_set options;
-  config_option_set::config_map config;
+  settings config;
 
   fixture() {
     options.add<bool>("global", "is_server", "enables server mode")
@@ -82,12 +94,35 @@ CAF_TEST(ini_consumer) {
   res.e = str.end();
   detail::parser::read_ini(res, consumer);
   CAF_CHECK_EQUAL(res.code, pec::success);
-  CAF_CHECK_EQUAL(get<bool>(config, "global.is_server"), true);
-  CAF_CHECK_EQUAL(get<uint16_t>(config, "global.port"), 4242u);
-  CAF_CHECK_EQUAL(get<ls>(config, "global.nodes"), ls({"sun", "venus"}));
+  CAF_CHECK_EQUAL(get<bool>(config, "is_server"), true);
+  CAF_CHECK_EQUAL(get<uint16_t>(config, "port"), 4242u);
+  CAF_CHECK_EQUAL(get<ls>(config, "nodes"), ls({"sun", "venus"}));
   CAF_CHECK_EQUAL(get<string>(config, "logger.file-name"), "foobar.ini");
   CAF_CHECK_EQUAL(get<timespan>(config, "scheduler.timing"), timespan(2000));
   CAF_CHECK_EQUAL(get<atom_value>(config, "scheduler.impl"), atom("foo"));
+}
+
+CAF_TEST(simplified syntax) {
+  std::string str = test_ini;
+  CAF_MESSAGE("read test_ini");
+  {
+    detail::ini_consumer consumer{options, config};
+    res.i = str.begin();
+    res.e = str.end();
+    detail::parser::read_ini(res, consumer);
+    CAF_CHECK_EQUAL(res.code, pec::success);
+  }
+  str = test_ini2;
+  settings config2;
+  CAF_MESSAGE("read test_ini2");
+  {
+    detail::ini_consumer consumer{options, config2};
+    res.i = str.begin();
+    res.e = str.end();
+    detail::parser::read_ini(res, consumer);
+    CAF_CHECK_EQUAL(res.code, pec::success);
+  }
+  CAF_CHECK_EQUAL(config, config2);
 }
 
 CAF_TEST_FIXTURE_SCOPE_END()

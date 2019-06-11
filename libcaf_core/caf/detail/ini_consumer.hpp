@@ -23,6 +23,7 @@
 #include "caf/config_option_set.hpp"
 #include "caf/config_value.hpp"
 #include "caf/dictionary.hpp"
+#include "caf/settings.hpp"
 
 namespace caf {
 namespace detail {
@@ -191,7 +192,7 @@ public:
 
   // -- constructors, destructors, and assignment operators --------------------
 
-  ini_consumer(config_option_set& options, config_map& cfg);
+  ini_consumer(config_option_set& options, settings& cfg);
 
   ini_consumer(ini_consumer&&) = default;
 
@@ -207,8 +208,8 @@ private:
   // -- member variables -------------------------------------------------------
 
   config_option_set& options_;
-  config_map& cfg_;
-  std::string current_key;
+  settings& cfg_;
+  std::string current_key_;
   std::vector<error> warnings_;
 };
 

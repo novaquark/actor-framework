@@ -36,7 +36,7 @@
 /// Denotes version of CAF in the format {MAJOR}{MINOR}{PATCH},
 /// whereas each number is a two-digit decimal number without
 /// leading zeros (e.g. 900 is version 0.9.0).
-#define CAF_VERSION 1602
+#define CAF_VERSION 1603
 
 /// Defined to the major version number of CAF.
 #define CAF_MAJOR_VERSION (CAF_VERSION / 10000)
@@ -214,7 +214,7 @@
 #elif defined(WIN32) || defined(_WIN32)
 #  define CAF_WINDOWS
 #else
-#  error Platform and/or compiler not supportet
+#  error Platform and/or compiler not supported
 #endif
 #if defined(CAF_MACOS) || defined(CAF_LINUX) || defined(CAF_BSD) || defined(CAF_CYGWIN)
 #  define CAF_POSIX

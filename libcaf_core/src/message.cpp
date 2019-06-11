@@ -82,7 +82,7 @@ uint32_t message::type_token() const noexcept {
   return vals_  != nullptr ? vals_->type_token() : 0xFFFFFFFF;
 }
 
-message::rtti_pair message::type(size_t pos) const noexcept {
+rtti_pair message::type(size_t pos) const noexcept {
   CAF_ASSERT(vals_ != nullptr);
   return vals_->type(pos);
 }
@@ -572,6 +572,14 @@ message::cli_arg::cli_arg(std::string nstr, std::string tstr,
 }
 
 // -- related non-members ------------------------------------------------------
+
+error inspect(serializer& sink, message& msg) {
+  return msg.save(sink);
+}
+
+error inspect(deserializer& source, message& msg) {
+  return msg.load(source);
+}
 
 std::string to_string(const message& msg) {
   if (msg.empty())

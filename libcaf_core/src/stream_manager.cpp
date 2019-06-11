@@ -26,12 +26,13 @@
 #include "caf/error.hpp"
 #include "caf/expected.hpp"
 #include "caf/inbound_path.hpp"
-#include "caf/scheduled_actor.hpp"
 #include "caf/logger.hpp"
 #include "caf/message.hpp"
 #include "caf/outbound_path.hpp"
 #include "caf/response_promise.hpp"
+#include "caf/scheduled_actor.hpp"
 #include "caf/sec.hpp"
+#include "caf/type_nr.hpp"
 
 namespace caf {
 
@@ -149,18 +150,19 @@ void stream_manager::advance() {
   CAF_LOG_TRACE("");
   // Try to emit more credit.
   if (!inbound_paths_.empty()) {
+    auto now = self_->clock().now();
     auto& cfg = self_->system().config();
     auto bc = cfg.stream_desired_batch_complexity;
     auto interval = cfg.stream_credit_round_interval;
-    auto& mbox = self_->mailbox();
-    auto& qs = get<2>(mbox.queue().queues()).queues();
+    auto& qs = self_->get_downstream_queue().queues();
     // Iterate all queues for inbound traffic.
     for (auto& kvp : qs) {
       auto inptr = kvp.second.policy().handler.get();
       // Ignore inbound paths of other managers.
       if (inptr->mgr.get() == this) {
         auto bs = static_cast<int32_t>(kvp.second.total_task_size());
-        inptr->emit_ack_batch(self_, bs, out().max_capacity(), interval, bc);
+        inptr->emit_ack_batch(self_, bs, out().max_capacity(), now, interval,
+                              bc);
       }
     }
   }
@@ -287,7 +289,7 @@ stream_manager::add_unchecked_outbound_path_impl(message handshake) {
   return add_unchecked_outbound_path_impl(rp, std::move(handshake));
 }
 
-stream_slot stream_manager::add_unchecked_inbound_path_impl() {
+stream_slot stream_manager::add_unchecked_inbound_path_impl(rtti_pair rtti) {
   CAF_LOG_TRACE("");
   auto x = self_->current_mailbox_element();
   if (x == nullptr || !x->content().match_elements<open_stream_msg>()) {
@@ -310,7 +312,8 @@ stream_slot stream_manager::add_unchecked_inbound_path_impl() {
   }
   auto slot = assign_next_slot();
   stream_slots path_id{osm.slot, slot};
-  auto ptr = self_->make_inbound_path(this, path_id, std::move(osm.prev_stage));
+  auto ptr = self_->make_inbound_path(this, path_id, std::move(osm.prev_stage),
+                                      rtti);
   CAF_ASSERT(ptr != nullptr);
   ptr->emit_ack_open(self_, actor_cast<actor_addr>(osm.original_stage));
   return slot;
