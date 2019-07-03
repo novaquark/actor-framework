@@ -108,7 +108,7 @@ match_case::result behavior_impl::invoke(detail::invoke_result_visitor& f,
   case tracing::TraceAppend::FirstAtom:
     if (xs.size() > 0)
     {
-      type_erased_tuple::rtti_pair type = xs.type(0);
+      rtti_pair type = xs.type(0);
       if (type.first == type_nr<atom_value>::value)
         trace_name = '(' + xs.stringify(0) + ')';
     }
