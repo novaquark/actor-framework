@@ -44,6 +44,13 @@ void actor_control_block::enqueue(strong_actor_ptr sender, message_id mid,
 
 void actor_control_block::enqueue(mailbox_element_ptr what,
                                   execution_unit* host) {
+#ifdef CAF_ENABLE_INSTRUMENTATION
+      if (what) {
+        // correct the timestamp here, because we don't want to measure the time in a delayed_send.
+        what->ts = make_timestamp();
+      }
+#endif
+
   get()->enqueue(std::move(what), host);
 }
 
