@@ -705,7 +705,7 @@ invoke_message_result scheduled_actor::consume(mailbox_element& x) {
       });
 
 #ifdef CAF_ENABLE_INSTRUMENTATION
-        auto msgtype = instrumentation::get_msgtype(current_element_->content());
+        auto msgtype = get_msgtype(current_element_->content());
         auto mb_wait_time = caf::timestamp_ago_ns(current_element_->ts);
         auto mb_size = mailbox_cached_count(); // WARNING: using size() here can crash.
 #endif
@@ -1212,6 +1212,11 @@ scheduled_actor::advance_streams(actor_clock::time_point now) {
         responses_times_.erase(rp_time);
       }
     }
+  }
+
+  instrumentation::msgtype_id scheduled_actor::get_msgtype(const type_erased_tuple& tuple) const
+  {
+    return instrumentation::get_msgtype(tuple);
   }
 # endif
 } // namespace caf

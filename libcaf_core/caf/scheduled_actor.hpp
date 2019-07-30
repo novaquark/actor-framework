@@ -294,6 +294,8 @@ public:
   size_t mailbox_cached_count() const {
     return mailbox_.last_size();
   }
+
+  virtual instrumentation::msgtype_id get_msgtype(const type_erased_tuple&) const;
 #endif
 
   // -- state modifiers --------------------------------------------------------
