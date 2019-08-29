@@ -132,23 +132,4 @@ namespace caf {
     }
   }
 }
-
-
-
-#else // CAF_ENABLE_OPENTRACING
-
-namespace caf {
-  namespace tracing {
-    void setTraceAppend(TraceAppend append) {}
-    TraceAppend getTraceAppend() {}
-    std::string getCurrentContext() {}
-    void setContext(std::string const& context) {}
-    void resetContext() {}
-    void openTrace(std::string const& name) {}
-    void closeTrace() {}
-    void setTraceNamePrefix(std::string const& prefix) {}
-    void resetTraceNamePrefix() {}
-  }
-}
-
 #endif // CAF_ENABLE_OPENTRACING

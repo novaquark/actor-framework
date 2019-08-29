@@ -24,6 +24,7 @@
 
 namespace caf {
   namespace tracing {
+
     enum class TraceAppend {
       /// Append nothing to the trace name.
       Nothing,
@@ -34,6 +35,8 @@ namespace caf {
       /// Append the whole argument list
       AllArguments,
     };
+
+#ifdef CAF_ENABLE_OPENTRACING
     void setTraceAppend(TraceAppend append);
     TraceAppend getTraceAppend();
     std::string getCurrentContext();
@@ -44,6 +47,17 @@ namespace caf {
     void closeTrace();
     void setTraceNamePrefix(std::string const& prefix);
     void resetTraceNamePrefix();
+#else
+    inline void setTraceAppend(TraceAppend ) {}
+    inline TraceAppend getTraceAppend() { return TraceAppend::Nothing; }
+    inline std::string getCurrentContext() { return ""; }
+    inline void setContext(std::string const& ) {}
+    inline void resetContext() {}
+    inline void openTrace(std::string const& ) {}
+    inline void closeTrace() {}
+    inline void setTraceNamePrefix(std::string const&) {}
+    inline void resetTraceNamePrefix() {}
+#endif
 
     class ScopedContext {
     public:
