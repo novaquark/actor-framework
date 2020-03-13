@@ -330,7 +330,7 @@ bool instance::handle(execution_unit* ctx, connection_handle hdl, header& hdr,
         return false;
       }
       // Close this connection if we already have a direct connection.
-      if (tbl_.lookup_direct(source_node)) {
+      if (tbl_.lookup_direct(source_node) && tbl_.lookup_direct(hdl)) {
         CAF_LOG_DEBUG(
           "close redundant direct connection:" << CAF_ARG(source_node));
         callee_.finalize_handshake(source_node, aid, sigs);
@@ -362,7 +362,7 @@ bool instance::handle(execution_unit* ctx, connection_handle hdl, header& hdr,
         return false;
       }
       // Drop repeated handshakes.
-      if (tbl_.lookup_direct(source_node)) {
+      if (tbl_.lookup_direct(source_node) && tbl_.lookup_direct(hdl)) {
         CAF_LOG_DEBUG(
           "received repeated client handshake:" << CAF_ARG(source_node));
         break;
