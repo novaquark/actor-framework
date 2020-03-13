@@ -107,8 +107,6 @@ bool routing_table::erase_indirect(const node_id& dest) {
 
 void routing_table::add_direct(const connection_handle& hdl,
                                const node_id& nid) {
-  CAF_ASSERT(direct_by_hdl_.count(hdl) == 0);
-  CAF_ASSERT(direct_by_nid_.count(nid) == 0);
   direct_by_hdl_.emplace(hdl, nid);
   direct_by_nid_.emplace(nid, hdl);
   parent_->parent().notify<hook::new_connection_established>(nid);
