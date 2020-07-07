@@ -306,6 +306,10 @@ public:
   /// @note Has no effect unless building CAF with CAF_ENABLE_ACTOR_PROFILER.
   actor_profiler* profiler = nullptr;
 
+  /// Provides system-wide optionnal CAF log callback
+  /// @experimental
+  void (*log_hook)(const logger::event&) = nullptr;
+
   /// Enables CAF to deserialize application-specific tracing information.
   /// @experimental
   /// @note Has no effect unless building CAF with CAF_ENABLE_ACTOR_PROFILER.

@@ -554,6 +554,9 @@ void logger::handle_console_event(const event& x) {
 void logger::handle_event(const event& x) {
   handle_file_event(x);
   handle_console_event(x);
+  void (*log_hook)(const event&) =  system_.config().log_hook;
+  if (log_hook)
+    log_hook(x);
 }
 
 void logger::log_first_line() {
