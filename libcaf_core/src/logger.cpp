@@ -271,10 +271,18 @@ actor_id logger::thread_local_aid(actor_id aid) {
 }
 
 void logger::log(event&& x) {
-  if (cfg_.inline_output)
-    handle_event(x);
+  void (*log_hook)(const event&) = system_.config().log_hook;
+  if (log_hook)
+  {
+    log_hook(x);
+  }
   else
-    queue_.push_back(std::move(x));
+  {
+    if (cfg_.inline_output)
+      handle_event(x);
+    else
+      queue_.push_back(std::move(x));
+  }
 }
 
 void logger::set_current_actor_system(actor_system* x) {
@@ -554,9 +562,6 @@ void logger::handle_console_event(const event& x) {
 void logger::handle_event(const event& x) {
   handle_file_event(x);
   handle_console_event(x);
-  void (*log_hook)(const event&) =  system_.config().log_hook;
-  if (log_hook)
-    log_hook(x);
 }
 
 void logger::log_first_line() {
