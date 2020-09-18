@@ -93,6 +93,27 @@ public:
     return request(dest, duration{timeout}, std::forward<Ts>(xs)...);
   }
 
+
+  template <class T, message_priority P = message_priority::normal>
+  std::pair<
+    caf::response_handle<caf::event_based_actor, caf::policy::single_response<caf::message>>,
+    caf::typed_response_promise<T>
+  > make_request_pair(const duration& timeout) {
+    auto self = static_cast<Subtype*>(this);
+    auto req_id = self->new_request_id(P);
+    self->request_response_timeout(timeout, req_id);
+    using handle_type = caf::response_handle<caf::event_based_actor, caf::policy::single_response<caf::message>>;
+    return std::make_pair(handle_type{self, req_id.response_id()}, caf::typed_response_promise<T>{self->ctrl(), self->ctrl(), {}, req_id});
+  }
+
+  template <class T, message_priority P = message_priority::normal, class Rep = int, class Period = std::ratio<1>>
+  std::pair<
+    caf::response_handle<caf::event_based_actor, caf::policy::single_response<caf::message>>,
+    caf::typed_response_promise<T>
+  > make_request_pair(std::chrono::duration<Rep, Period> timeout) {
+    return make_request_pair<T, P>(duration{timeout});
+  }
+
   /// Sends `{xs...}` to each actor in the range `destinations` as a synchronous
   /// message. Response messages get combined into a single result according to
   /// the `MergePolicy`.

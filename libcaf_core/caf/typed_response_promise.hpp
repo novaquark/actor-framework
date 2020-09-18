@@ -37,6 +37,11 @@ public:
       : promise_(std::move(self), src) {
     // nop
   }
+  typed_response_promise(strong_actor_ptr self, strong_actor_ptr source,
+                   response_promise::forwarding_stack stages, message_id id)
+      : promise_(self, source, stages, id) {
+     // nop
+    }
 
   typed_response_promise(typed_response_promise&&) = default;
   typed_response_promise(const typed_response_promise&) = default;

@@ -178,6 +178,89 @@ CAF_TEST(requesters support fan_out_request) {
   CAF_CHECK_EQUAL(*sum, 9);
 }
 
+CAF_TEST(request_pair) {
+  SUBTEST("request_pair_simple_then") {
+    auto client = sys.spawn([=](event_based_actor* self) {
+      auto [handle, promise] = self->make_request_pair<int>(infinite);
+      handle.then([=](int v){ *result = v; });
+      promise.deliver(3);
+    });
+    run_once();
+    CAF_CHECK_EQUAL(*result, 3);
+  }
+  SUBTEST("request_pair_simple_await") {
+    auto client = sys.spawn([=](event_based_actor* self) {
+      auto [handle, promise] = self->make_request_pair<int>(infinite);
+      handle.await([=](int v){ *result = v; });
+      promise.deliver(35);
+    });
+    run_once();
+    CAF_CHECK_EQUAL(*result, 35);
+  }
+  SUBTEST("request_pair_chained_then") {
+    auto res1 = std::make_shared<int>(0);
+    auto client = sys.spawn([=](event_based_actor* self) {
+      auto [handle2, promise2] = self->make_request_pair<int>(infinite);
+      auto [handle, promise] = self->make_request_pair<int>(infinite);
+      handle.then([res1,promise2=std::move(promise2)](int val) mutable {
+        promise2.deliver(val + 4);
+        *res1 = val;
+      });
+      handle2.then([=](int r){ *result = r; });
+      promise.deliver(21);
+    });
+    run();
+    CAF_CHECK_EQUAL(*res1, 21);
+    CAF_CHECK_EQUAL(*result, 21 + 4);
+  }
+  SUBTEST("request_pair_multiple_then") {
+    auto res = std::make_shared<unsigned long>(0);
+    auto client = sys.spawn([=](event_based_actor* self) {
+      std::array<typed_response_promise<unsigned long>, 60> promises{};
+      for (int i = 0; i < 60; i++)
+      {
+        auto [handle, promise] = self->make_request_pair<unsigned long>(infinite);
+        handle.then([=](unsigned long val){
+          (*res) |= val;
+        });
+
+        promises[i] = std::move(promise);
+      }
+
+      for (int i = 0; i < 60; i++)
+      {
+        unsigned long v = 1ul << i;
+        promises[i].deliver(v);
+      }
+    });
+    run();
+    CAF_CHECK_EQUAL(*res, (1ul<<60) - 1);
+  }
+  SUBTEST("request_pair_multiple_await") {
+    auto res = std::make_shared<unsigned long>(0);
+    auto client = sys.spawn([=](event_based_actor* self) {
+      std::array<typed_response_promise<unsigned long>, 60> promises{};
+      for (int i = 0; i < 60; i++)
+      {
+        auto [handle, promise] = self->make_request_pair<unsigned long>(infinite);
+        handle.await([=](unsigned long val){
+          (*res) |= val;
+        });
+
+        promises[i] = std::move(promise);
+      }
+
+      for (int i = 0; i < 60; i++)
+      {
+        unsigned long v = 1ul << i;
+        promises[i].deliver(v);
+      }
+    });
+    run();
+    CAF_CHECK_EQUAL(*res, (1ul<<60) - 1);
+  }
+}
+
 #ifndef CAF_NO_EXCEPTIONS
 
 CAF_TEST(exceptions while processing requests trigger error messages) {
